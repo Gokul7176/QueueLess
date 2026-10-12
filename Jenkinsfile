@@ -19,6 +19,8 @@ pipeline {
         TARGET_PORT = "${params.APP_PORT}"
         TARGET_CONTAINER = "${params.CONTAINER_NAME}"
         TARGET_IMAGE = "${params.IMAGE_NAME}"
+        // Add Docker Desktop bin directory to PATH for Windows Jenkins service
+        PATH = "C:\\Users\\Lenovo\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin;C:\\Program Files\\Docker\\Docker\\resources\\bin;${env.PATH}"
     }
 
     options {
@@ -103,7 +105,11 @@ pipeline {
                     if (isUnix()) {
                         sh "docker build -t ${TARGET_IMAGE} ."
                     } else {
-                        bat "docker build -t ${TARGET_IMAGE} ."
+                        bat """
+                            @echo off
+                            where docker >nul 2>&1 || set "PATH=C:\\Users\\Lenovo\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin;%PATH%"
+                            docker build -t ${TARGET_IMAGE} .
+                        """
                     }
                 }
             }
@@ -124,6 +130,8 @@ pipeline {
                         """
                     } else {
                         bat """
+                            @echo off
+                            where docker >nul 2>&1 || set "PATH=C:\\Users\\Lenovo\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin;%PATH%"
                             docker stop ${TARGET_CONTAINER} >nul 2>&1 || verify >nul
                             docker rm ${TARGET_CONTAINER} >nul 2>&1 || verify >nul
                             docker run -d -p ${TARGET_PORT}:8085 --name ${TARGET_CONTAINER} --restart unless-stopped ${TARGET_IMAGE}
@@ -139,7 +147,7 @@ pipeline {
         stage('7. Verify Deployment') {
             steps {
                 echo "Verifying application health and responsiveness at http://localhost:${TARGET_PORT}/api/tickets/stats..."
-                sleep time: 10, unit: 'SECONDS'
+                sleep time: 8, unit: 'SECONDS'
                 script {
                     if (isUnix()) {
                         sh """
@@ -156,7 +164,7 @@ pipeline {
                         """
                     } else {
                         bat """
-                            powershell -NoProfile -ExecutionPolicy Bypass -Command "\$healthy = \$false; for (\$i = 1; \$i -le 5; \$i++) { try { \$r = Invoke-RestMethod -Uri 'http://localhost:${TARGET_PORT}/api/tickets/stats' -Method Get -TimeoutSec 5; if (\$r.success -eq \$true) { Write-Host 'Verification successful: ' (\$r | ConvertTo-Json -Compress); \$healthy = \$true; break } } catch { Write-Host 'Warmup retry '\$i'/5...'; Start-Sleep -Seconds 3 } }; if (-not \$healthy) { Write-Error 'Deployment verification failed'; exit 1 }"
+                            powershell -NoProfile -ExecutionPolicy Bypass -Command "\$healthy = \$false; for (\$i = 1; \$i -le 6; \$i++) { try { \$r = Invoke-RestMethod -Uri 'http://localhost:${TARGET_PORT}/api/tickets/stats' -Method Get -TimeoutSec 5; if (\$r.success -eq \$true) { Write-Host 'Verification successful: ' (\$r | ConvertTo-Json -Compress); \$healthy = \$true; break } } catch { Write-Host 'Warmup retry '\$i'/6...'; Start-Sleep -Seconds 3 } }; if (-not \$healthy) { Write-Error 'Deployment verification failed'; exit 1 }"
                         """
                     }
                 }
