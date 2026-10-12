@@ -1,0 +1,120 @@
+---
+# ==============================================================================
+# QueueLess — Ansible Deployment Playbook
+# College DevOps Laboratory Project — 23IT723 (Experiment 10)
+# Automates host provisioning, Docker setup, container lifecycle & verification
+# ==============================================================================
+
+- name: Deploy QueueLess Virtual Queue Management Application
+  hosts: all
+  become: yes
+  vars:
+    app_name: queueless
+    app_version: "1.0.0"
+    app_port: 8085
+    container_port: 8085
+    container_name: queueless-app
+    image_name: "queueless:latest"
+    deploy_dir: /opt/queueless
+    health_check_url: "http://localhost:{{ app_port }}/api/tickets/stats"
+
+  tasks:
+    # --------------------------------------------------------------------------
+    # Task 1: Verify Host Connectivity
+    # --------------------------------------------------------------------------
+    - name: Test connectivity to target node
+      ansible.builtin.ping:
+
+    # --------------------------------------------------------------------------
+    # Task 2: Create Deployment Directory Structure
+    # --------------------------------------------------------------------------
+    - name: Create application deployment directory
+      ansible.builtin.file:
+        path: "{{ deploy_dir }}"
+        state: directory
+        mode: '0755'
+
+    # --------------------------------------------------------------------------
+    # Task 3: Ensure System Dependencies & Prerequisites
+    # --------------------------------------------------------------------------
+    - name: Install required system packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+          - python3
+          - python3-pip
+          - docker.io
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    # --------------------------------------------------------------------------
+    # Task 4: Ensure Docker Daemon is Active
+    # --------------------------------------------------------------------------
+    - name: Ensure Docker daemon service is started and enabled
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    # --------------------------------------------------------------------------
+    # Task 5: Check Pre-existing Container
+    # --------------------------------------------------------------------------
+    - name: Stop and remove existing QueueLess container if present
+      ansible.builtin.command:
+        cmd: "docker rm -f {{ container_name }}"
+      register: remove_container_result
+      failed_when: false
+      changed_when: remove_container_result.rc == 0
+
+    # --------------------------------------------------------------------------
+    # Task 6: Run Application Container
+    # --------------------------------------------------------------------------
+    - name: Start QueueLess container
+      ansible.builtin.command:
+        cmd: >
+          docker run -d
+          --name {{ container_name }}
+          --restart unless-stopped
+          -p {{ app_port }}:{{ container_port }}
+          -e SERVER_PORT={{ container_port }}
+          {{ image_name }}
+      register: docker_run_result
+      changed_when: docker_run_result.rc == 0
+
+    # --------------------------------------------------------------------------
+    # Task 7: Wait for Application Warm-up
+    # --------------------------------------------------------------------------
+    - name: Pause 10 seconds for Spring Boot container bootstrap
+      ansible.builtin.pause:
+        seconds: 10
+
+    # --------------------------------------------------------------------------
+    # Task 8: Verification & Smoke Test
+    # --------------------------------------------------------------------------
+    - name: Verify application endpoint is healthy
+      ansible.builtin.uri:
+        url: "{{ health_check_url }}"
+        method: GET
+        status_code: 200
+        return_content: yes
+      register: health_check
+      retries: 5
+      delay: 5
+      until: health_check.status == 200
+
+    # --------------------------------------------------------------------------
+    # Task 9: Output Deployment Summary
+    # --------------------------------------------------------------------------
+    - name: Display deployment success information
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "QueueLess Application Deployment Successful!"
+          - "Container Name : {{ container_name }}"
+          - "Access URL     : http://localhost:{{ app_port }}/"
+          - "Health Status  : {{ health_check.json.message | default('OK') }}"
+          - "Waiting Count  : {{ health_check.json.data.waitingCount | default('N/A') }}"
+          - "=========================================================="

@@ -1,0 +1,23 @@
+# Exclude Git files
+.git
+.gitignore
+
+# Exclude local test logs and IDE metadata
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Exclude documentation and experiment markdown
+experiments/
+docs/
+ansible/
+*.md
+
+# Exclude local scratch files and dumps
+*.log
+*.tmp
+hs_err_pid*
+Thumbs.db

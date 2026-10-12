@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="QueueLess — End-to-End CI/CD Powered Virtual Queue Management System. Modern, real-time college DevOps laboratory application.">
+    <title>QueueLess — Virtual Queue Management System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand-group">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1 class="brand-title">QueueLess</h1>
+                    <span class="brand-badge">CI/CD DevOps Lab • 23IT723</span>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="view-tabs" role="tablist">
+                <button class="tab-btn active" id="tabCustomerBtn" data-tab="customer-view" role="tab" aria-selected="true">
+                    <span class="tab-icon">👤</span> Customer Portal
+                </button>
+                <button class="tab-btn" id="tabAdminBtn" data-tab="admin-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">🛡️</span> Admin Console
+                </button>
+                <button class="tab-btn" id="tabDisplayBtn" data-tab="display-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">📺</span> Live Queue Board
+                </button>
+            </nav>
+
+            <!-- Status Indicator & Clock -->
+            <div class="header-status">
+                <div class="status-pill online" id="serverStatusBadge">
+                    <span class="status-dot"></span>
+                    <span id="serverStatusText">System Online</span>
+                </div>
+                <div class="clock-display" id="clockDisplay">--:--:--</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+        <!-- Global Alert Banner -->
+        <div id="systemAlert" class="system-alert hidden" role="alert"></div>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 1: CUSTOMER QUEUE PORTAL -->
+        <!-- ============================================================= -->
+        <section id="customer-view" class="view-panel active" role="tabpanel">
+            <div class="view-header">
+                <div class="header-info">
+                    <h2>Virtual Queue Check-in & Status</h2>
+                    <p>Join the digital waiting line from any device. Receive a virtual ticket and track your exact queue position in real time.</p>
+                </div>
+            </div>
+
+            <div class="customer-grid">
+                <!-- Join Queue Form Card -->
+                <div class="card card-form">
+                    <div class="card-header">
+                        <div class="card-icon indigo">🎫</div>
+                        <div>
+                            <h3>Join Virtual Queue</h3>
+                            <p class="card-subtitle">Generate your personal queue token</p>
+                        </div>
+                    </div>
+
+                    <form id="joinQueueForm" class="form-body" novalidate>
+                        <div class="form-group">
+                            <label for="customerNameInput">Full Name <span class="required">*</span></label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">👤</span>
+                                <input type="text" id="customerNameInput" class="form-control" placeholder="e.g. Alex Morgan" required minlength="2" maxlength="50" autocomplete="name">
+                            </div>
+                            <span class="form-error" id="nameError"></span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="serviceTypeSelect">Service Category</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">🏢</span>
+                                <select id="serviceTypeSelect" class="form-control">
+                                    <option value="General Inquiry">General Inquiry</option>
+                                    <option value="Account Services">Account Services</option>
+                                    <option value="Technical Support">Technical Support</option>
+                                    <option value="Billing & Payments">Billing & Payments</option>
+                                    <option value="Express Counter">Express Document Verification</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block" id="btnJoinQueue">
+                            <span class="btn-text">Generate Queue Ticket</span>
+                            <span class="btn-spinner hidden"></span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Check / Active Ticket Card -->
+                <div class="card card-ticket">
+                    <div class="card-header">
+                        <div class="card-icon emerald">🔍</div>
+                        <div>
+                            <h3>Ticket Status Tracker</h3>
+                            <p class="card-subtitle">Track your existing ticket position</p>
+                        </div>
+                    </div>
+
+                    <div class="ticket-search-box">
+                        <input type="text" id="searchTicketInput" class="form-control" placeholder="Enter Ticket # (e.g. QL-0002)" style="text-transform: uppercase;">
+                        <button class="btn btn-secondary" id="btnSearchTicket">Check</button>
+                    </div>
+
+                    <!-- Active Ticket Display Container -->
+                    <div id="activeTicketDisplay" class="ticket-card-pass hidden">
+                        <div class="pass-header">
+                            <div class="pass-label">OFFICIAL QUEUE PASS</div>
+                            <div class="pass-badge" id="ticketStatusBadge">WAITING</div>
+                        </div>
+
+                        <div class="pass-body">
+                            <div class="ticket-number-display" id="ticketNumberDisplay">QL-0000</div>
+                            <div class="ticket-customer-name" id="ticketCustomerDisplay">Customer Name</div>
+                            <div class="ticket-service-type" id="ticketServiceDisplay">Service Category</div>
+
+                            <div class="pass-metrics-row">
+                                <div class="metric-box">
+                                    <span class="metric-label">Queue Position</span>
+                                    <span class="metric-value highlight" id="ticketPositionDisplay"># 1</span>
+                                </div>
+                                <div class="metric-box">
+                                    <span class="metric-label">Est. Wait</span>
+                                    <span class="metric-value" id="ticketWaitDisplay">~5 mins</span>
+                                </div>
+                                <div class="metric-box">
+                                    <span class="metric-label">Service Desk</span>
+                                    <span class="metric-value" id="ticketCounterDisplay">Pending</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pass-footer">
+                            <span class="pass-time" id="ticketJoinedTimeDisplay">Joined: Just now</span>
+                            <button class="btn btn-outline-danger btn-sm" id="btnCancelMyTicket">Cancel Ticket</button>
+                        </div>
+                    </div>
+
+                    <!-- Empty / Prompt Placeholder -->
+                    <div id="ticketEmptyState" class="empty-state">
+                        <div class="empty-icon">🎫</div>
+                        <h4>No Active Ticket Selected</h4>
+                        <p>Fill out the form on the left to join the queue, or enter an existing ticket number above to check your live status.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 2: ADMIN OPERATIONS CONSOLE -->
+        <!-- ============================================================= -->
+        <section id="admin-view" class="view-panel" role="tabpanel">
+            <div class="view-header flex-between">
+                <div>
+                    <h2>Queue Administrator Dashboard</h2>
+                    <p>Real-time queue operations, desk assignment, live status management, and statistics.</p>
+                </div>
+                <div class="admin-controls-top">
+                    <label class="auto-refresh-switch">
+                        <input type="checkbox" id="autoRefreshToggle" checked>
+                        <span class="slider"></span>
+                        <span class="switch-label">Live Sync (5s)</span>
+                    </label>
+                    <button class="btn btn-secondary btn-sm" id="btnManualRefresh">
+                        <span>🔄 Refresh</span>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" id="btnResetQueue">
+                        <span>⚠️ Reset All</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPI Metric Stats Bar -->
+            <div class="kpi-grid">
+                <div class="kpi-card amber">
+                    <div class="kpi-icon">⏳</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value" id="kpiWaiting">0</span>
+                        <span class="kpi-label">Waiting in Queue</span>
+                    </div>
+                </div>
+                <div class="kpi-card emerald">
+                    <div class="kpi-icon">🎯</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value" id="kpiServing">0</span>
+                        <span class="kpi-label">Currently Serving</span>
+                    </div>
+                </div>
+                <div class="kpi-card blue">
+                    <div class="kpi-icon">✅</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value" id="kpiCompleted">0</span>
+                        <span class="kpi-label">Completed Today</span>
+                    </div>
+                </div>
+                <div class="kpi-card slate">
+                    <div class="kpi-icon">📊</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value" id="kpiTotal">0</span>
+                        <span class="kpi-label">Total Handled</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Operations Dispatch Bar -->
+            <div class="card dispatch-card">
+                <div class="dispatch-group">
+                    <div class="dispatch-field">
+                        <label for="adminCounterSelect">Active Desk Counter:</label>
+                        <select id="adminCounterSelect" class="form-control-sm">
+                            <option value="Counter 1">Counter 1 (General)</option>
+                            <option value="Counter 2">Counter 2 (Accounts)</option>
+                            <option value="Counter 3">Counter 3 (Tech Support)</option>
+                            <option value="Desk 4">Desk 4 (Express)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-success btn-lg" id="btnCallNext">
+                        <span class="btn-icon">📢</span> Call Next Waiting Customer
+                    </button>
+                </div>
+
+                <div class="filter-group">
+                    <label>Filter Tickets:</label>
+                    <div class="pill-group" id="filterPills">
+                        <button class="pill active" data-filter="ALL">All</button>
+                        <button class="pill" data-filter="WAITING">Waiting</button>
+                        <button class="pill" data-filter="SERVING">Serving</button>
+                        <button class="pill" data-filter="COMPLETED">Completed</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tickets Table -->
+            <div class="card table-card">
+                <div class="table-responsive">
+                    <table class="data-table" id="ticketsTable">
+                        <thead>
+                            <tr>
+                                <th>Ticket #</th>
+                                <th>Customer Name</th>
+                                <th>Service Category</th>
+                                <th>Status</th>
+                                <th>Queue Pos.</th>
+                                <th>Desk</th>
+                                <th>Joined At</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ticketsTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center loading-cell">Loading tickets...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 3: LIVE QUEUE DISPLAY BOARD (PUBLIC SCREEN) -->
+        <!-- ============================================================= -->
+        <section id="display-view" class="view-panel" role="tabpanel">
+            <div class="view-header">
+                <div class="header-info">
+                    <h2>Public Announcement & Queue Display Board</h2>
+                    <p>Live synchronized waiting hall monitor showing serving counters and upcoming customer tickets.</p>
+                </div>
+            </div>
+
+            <div class="board-layout">
+                <!-- Serving Counters Panel -->
+                <div class="board-column serving-column">
+                    <div class="board-column-header emerald">
+                        <span class="pulse-indicator"></span> NOW SERVING AT COUNTERS
+                    </div>
+                    <div id="servingCountersContainer" class="serving-cards-grid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Next in Queue Panel -->
+                <div class="board-column waiting-column">
+                    <div class="board-column-header amber">
+                        <span>⏳ UP NEXT IN LINE</span>
+                    </div>
+                    <div id="upNextListContainer" class="up-next-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <!-- Scripts -->
+    <script src="js/app.js"></script>
+</body>
+</html>
