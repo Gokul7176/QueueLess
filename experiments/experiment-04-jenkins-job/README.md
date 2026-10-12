@@ -2,156 +2,188 @@
 
 **Course Code:** 23IT723 — DevOps Laboratory  
 **Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Job Name:** `QueueLess-Build`  
+**Target Repository:** `https://github.com/Gokul7176/QueueLess.git`  
+**Branch:** `main`  
 
 ---
 
 ## 1. Aim
-To install and configure Jenkins CI server, link it to the QueueLess GitHub repository, configure required global JDK and Maven tools, create an automated Jenkins Freestyle build job, trigger builds, and analyze build console logs and test artifacts.
+To configure a Jenkins Freestyle build job named `QueueLess-Build` connected to the official GitHub repository `https://github.com/Gokul7176/QueueLess.git`, automate code checkout on branch `main`, compile and execute the 17 JUnit 5 automated test cases using the project's native Maven Wrapper (`mvnw.cmd`), publish JUnit XML test reports, inspect console outputs, and verify failure detection.
 
 ---
 
 ## 2. Requirements & Prerequisites
-- **Operating System:** Windows 10/11 or Ubuntu Linux
-- **Software:** Java JDK 17+, Apache Maven 3.9+, Git (v2.40+), Jenkins (v2.400+)
-- **Jenkins URL:** `http://localhost:8080` (Default Jenkins port)
-- **QueueLess Port:** `8085` (configured to prevent port collisions with Jenkins on 8080)
-- **Repository URL:** `https://github.com/<your-username>/queueless.git` or local repository path
+- **Operating System:** Windows 11 (Host running Jenkins Windows Service on Port 8080)
+- **Jenkins Version:** Jenkins 2.573+ (Running at `http://localhost:8080`)
+- **JDK:** OpenJDK 21 LTS (`C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot`)
+- **Build Tool:** Project Maven Wrapper (`mvnw.cmd` with built-in JDK auto-detection)
+- **Version Control:** Git 2.55+ installed at `C:\Program Files\Git\cmd\git.exe`
+- **Application Port:** QueueLess runs on port **8085** to completely eliminate port conflicts with Jenkins on **8080**.
 
 ---
 
 ## 3. Theory
 
-### What is Jenkins?
-Jenkins is the industry-standard, self-contained, open-source Continuous Integration (CI) automation server. In a DevOps culture, CI ensures that as developers commit code, an automated agent checks out the code, executes static analysis, runs compilers, executes test suites, and flags regressions within minutes.
+### What is a Jenkins Freestyle Project?
+A Jenkins Freestyle project is a configurable automation job created through the Jenkins web interface. It provides a structured GUI to:
+1. Define Source Code Management (SCM) triggers and repository endpoints.
+2. Schedule automated polling (Poll SCM) or webhook triggers.
+3. Execute operating-system-specific build steps (such as Windows Batch `bat` commands or Linux shell `sh`).
+4. Execute automated test suites and parse standardized test output schemas (JUnit XML).
+5. Enforce build failure criteria: if the compiler fails or any test assertion fails, the job immediately terminates with build status `FAILURE` (Red/Weather icon alert).
 
-### Jenkins Architecture:
-- **Jenkins Controller (Master):** Manages the web UI, orchestrates builds, stores configurations, archives build logs, and schedules workloads.
-- **Jenkins Agent (Node):** Executes tasks assigned by the controller. Can run on bare metal, virtual machines, or Docker containers.
-- **Freestyle Project:** The foundational Jenkins job type offering a form-based web interface to configure SCM triggers, build steps (Maven, Shell, Batch), and post-build actions without writing code.
-
-### Jenkins Directory Layout:
-- Jenkins stores workspace and job data in `JENKINS_HOME` (e.g., `C:\ProgramData\Jenkins\.jenkins` or `~/.jenkins`):
-  - `jobs/<job-name>/builds/`: Individual build metadata, console logs, and test results.
-  - `workspace/<job-name>/`: Cloned source code checked out from Git.
+### Maven Wrapper in CI/CD Environments:
+Instead of requiring Jenkins administrators to manually install and configure specific Maven tool versions under "Global Tool Configuration", QueueLess bundles the official cross-platform **Maven Wrapper** (`mvnw` for Linux/macOS and `mvnw.cmd` for Windows). The wrapper guarantees reproducible builds across any agent machine by downloading the exact required Maven binaries and automatically locating the active JDK installation.
 
 ---
 
-## 4. Step-by-Step Procedure
+## 4. Step-by-Step Jenkins Configuration Guide
 
-### Part 1: Initial Jenkins Setup
-1. Download Jenkins Generic Java package (`jenkins.war`) or installer from [jenkins.io](https://www.jenkins.io/download/).
-2. Run Jenkins with Java 17+:
-   ```powershell
-   java -jar jenkins.war --httpPort=8080
+Follow these exact steps in your web browser:
+
+### Step 1: Open Jenkins Dashboard
+1. Open Google Chrome or Microsoft Edge and navigate to:
    ```
-3. Open browser at `http://localhost:8080`.
-4. Retrieve the initial admin password from the console or the file shown on screen (e.g., `secrets/initialAdminPassword`).
-5. Choose **"Install Suggested Plugins"** (installs Git, Pipeline, JUnit, Workspace Cleanup).
-6. Create an administrator user account (e.g., `admin` / `AdminPass123`).
+   http://localhost:8080/
+   ```
+2. Log in using your Jenkins administrator credentials.
 
-### Part 2: Global Tool Configuration
-1. Navigate to **Dashboard -> Manage Jenkins -> Tools** (or Global Tool Configuration).
-2. Under **JDK installations**:
-   - Click **Add JDK**.
-   - Name: `JDK-17` (or `Temurin-21`).
-   - Uncheck "Install automatically" and set `JAVA_HOME` to your installed JDK directory (e.g., `C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot` or `/usr/lib/jvm/java-17-openjdk`).
-3. Under **Maven installations**:
-   - Click **Add Maven**.
-   - Name: `Maven-3.9.6`.
-   - Set `MAVEN_HOME` to `C:\tools\apache-maven-3.9.6` (or check "Install automatically" from Apache).
-4. Under **Git installations**:
-   - Path to Git executable: `git.exe` or `C:\Program Files\Git\cmd\git.exe`.
-5. Click **Save**.
+### Step 2: Create the Freestyle Job
+1. On the left navigation sidebar, click **New Item**.
+2. Enter item name: **`QueueLess-Build`**.
+3. Select **Freestyle project**.
+4. Click **OK** at the bottom of the page.
 
-### Part 3: Create the QueueLess Freestyle Build Job
-1. Click **New Item** from the Jenkins dashboard.
-2. Enter item name: `QueueLess-Freestyle-Build`.
-3. Select **Freestyle project** and click **OK**.
-4. In **Source Code Management**:
-   - Select **Git**.
-   - Repository URL: `https://github.com/<your-username>/queueless.git` (or local file URI `file:///C:/queuless`).
-   - Branch Specifier: `*/main`.
-5. In **Build Triggers**:
-   - Select **Poll SCM** (`H/5 * * * *` for 5-minute polling) or GitHub hook trigger.
-6. In **Build Steps**:
-   - Click **Add build step -> Invoke top-level Maven targets**.
-   - Maven Version: `Maven-3.9.6`.
-   - Goals: `clean compile test package`.
-   - POM: `pom.xml`.
-7. In **Post-build Actions**:
-   - Click **Add post-build action -> Publish JUnit test result report**.
-   - Test report XMLs: `**/target/surefire-reports/*.xml`.
-8. Click **Save**.
+### Step 3: Configure Source Code Management (Git)
+1. On the job configuration screen, scroll down to **Source Code Management**.
+2. Select the **Git** radio button.
+3. In the **Repository URL** field, enter:
+   ```
+   https://github.com/Gokul7176/QueueLess.git
+   ```
+4. **Credentials:** If the repository is public, leave as `- none -`. If private, select your GitHub Personal Access Token credential.
+5. In **Branches to build**, set the **Branch Specifier**:
+   ```
+   */main
+   ```
 
-### Part 4: Execute Build & Inspect Output
-1. Click **Build Now** on the left menu.
-2. Click on the initiated build (e.g., `#1`) in the Build History pane.
-3. Open **Console Output** to observe real-time compilation, testing, and packaging.
-4. Check that build status concludes with `Finished: SUCCESS`.
+### Step 4: Configure Build Triggers (Optional)
+- Check **GitHub hook trigger for GITScm polling** (for instant webhook builds) OR:
+- Check **Poll SCM** and enter `H/5 * * * *` (polls every 5 minutes for new commits).
+
+### Step 5: Configure Build Steps (Windows Batch Command)
+1. Scroll down to the **Build Steps** section.
+2. Click **Add build step** -> Select **Execute Windows batch command**.
+3. In the **Command** text area, enter:
+   ```cmd
+   call mvnw.cmd clean compile test
+   ```
+   *(Note: The `call` prefix ensures that `mvnw.cmd` returns control to Jenkins so post-build actions and exit codes are recorded accurately).*
+
+### Step 6: Configure Post-build Actions (JUnit Test Reporting)
+1. Click **Add post-build action** -> Select **Publish JUnit test result report**.
+2. In **Test report XMLs**, enter:
+   ```
+   target/surefire-reports/*.xml
+   ```
+3. Click **Save** to store the job configuration.
 
 ---
 
-## 5. Verification Commands (CLI)
+## 5. Build Execution & Log Verification
 
-```powershell
-# Verify Jenkins process is active on port 8080
-Get-NetTCPConnection -LocalPort 8080
+1. On the **`QueueLess-Build`** project page, click **Build Now** on the left menu.
+2. Under **Build History**, click the flashing blue ball for **Build #1**.
+3. Click **Console Output** to monitor the live build log.
 
-# Query Jenkins HTTP header
-curl.exe -sI http://localhost:8080
+### Expected Console Output Snippet:
+```text
+Started by user admin
+Running as SYSTEM
+Building in workspace C:\ProgramData\Jenkins\.jenkins\workspace\QueueLess-Build
+[WS-CLEANUP] Deleting project workspace...
+Cloning the remote Git repository
+Cloning repository https://github.com/Gokul7176/QueueLess.git
+ > git.exe init C:\ProgramData\Jenkins\.jenkins\workspace\QueueLess-Build
+ > git.exe fetch --tags --force --progress -- https://github.com/Gokul7176/QueueLess.git +refs/heads/*:refs/remotes/origin/*
+ > git.exe checkout -f refs/remotes/origin/main
+Commit message: "ci: enhance Jenkinsfile and auto-detect JAVA_HOME in mvnw.cmd for Windows Jenkins agent"
 
-# Verify Maven test report XML files generated in target/
-Get-ChildItem -Path "target\surefire-reports\*.xml" | Select-Object Name, Length
+[QueueLess-Build] $ cmd /c call mvnw.cmd clean compile test
+[INFO] Scanning for projects...
+[INFO] Building QueueLess 1.0.0
+[INFO] --- maven-compiler-plugin:3.13.0:compile (default-compile) @ queueless ---
+[INFO] Compiling 16 source files
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ queueless ---
+[INFO] Running com.queueless.QueueControllerIntegrationTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.queueless.QueueServiceTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] Results:
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+Recording test results
+Finished: SUCCESS
 ```
 
 ---
 
-## 6. Actual Verification Method
+## 6. Failure Detection & Quality Gate Verification
 
-1. Jenkins Dashboard displays a blue or green weather icon next to `QueueLess-Freestyle-Build` indicating stable build health.
-2. The Console Output ends with:
+To demonstrate that `QueueLess-Build` properly reports failures when bugs or syntax errors occur:
+
+1. In `src/test/java/com/queueless/QueueServiceTest.java`, edit a test assertion to fail:
+   ```java
+   assertEquals(TicketStatus.COMPLETED, createdTicket.getStatus()); // Intentionally wrong
    ```
-   [INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
-   [INFO] BUILD SUCCESS
-   Recording test results
-   Finished: SUCCESS
+2. Commit and push to GitHub:
+   ```powershell
+   git commit -am "test: intentional assertion failure"
+   git push origin main
    ```
-3. Click **Test Result** in the Jenkins job page to inspect the interactive graphical JUnit test chart showing 17 passed test cases across `QueueControllerIntegrationTest` and `QueueServiceTest`.
+3. Trigger **Build Now** in Jenkins.
+4. Verify that Jenkins outputs:
+   ```text
+   [ERROR] Failures: 
+   [ERROR]   QueueServiceTest.testJoinQueue_Success:54 expected: <COMPLETED> but was: <WAITING>
+   [INFO] BUILD FAILURE
+   Build step 'Execute Windows batch command' marked build as failure
+   Finished: FAILURE
+   ```
+5. Revert the test assertion and push to restore stable green status.
 
 ---
 
-## 7. Expected Result vs. Observed Result
+## 7. Screenshot Checklist
 
-- **Expected Result:**  
-  Jenkins connects to Git, pulls the latest code, executes `clean compile test package` using Maven, tests pass (17/17), fat JAR is packaged into `target/`, JUnit reports are parsed, and the build state turns blue/green (`SUCCESS`).
+Capture the following screenshots from your Jenkins interface for your lab record:
 
-- **Observed Result:**  
-  Build `#1` executed in 24 seconds. 17 test cases passed with 0 failures and 0 errors. Test result trend chart updated automatically.
-
----
-
-## 8. Screenshot Checklist
-
-- [ ] `exp04_01_jenkins_tools_config.png`: Global Tool Configuration screen showing `JDK-17` and `Maven-3.9.6`.
-- [ ] `exp04_02_job_scm_config.png`: Job configuration page showing Git repository URL and branch `*/main`.
-- [ ] `exp04_03_job_maven_goals.png`: Build step showing `Invoke top-level Maven targets` with `clean compile test package`.
-- [ ] `exp04_04_build_console_success.png`: Console Output page ending in `BUILD SUCCESS` and `Finished: SUCCESS`.
-- [ ] `exp04_05_junit_test_report_chart.png`: Jenkins Test Result page showing the 17 passed tests and duration breakdown.
+- [ ] `exp04_01_freestyle_item_creation.png`: New Item screen showing `QueueLess-Build` selected as Freestyle project.
+- [ ] `exp04_02_git_scm_config.png`: Job configuration showing Git URL `https://github.com/Gokul7176/QueueLess.git` and branch `*/main`.
+- [ ] `exp04_03_batch_build_step.png`: Build step showing `call mvnw.cmd clean compile test`.
+- [ ] `exp04_04_junit_action_config.png`: Post-build Action showing `target/surefire-reports/*.xml`.
+- [ ] `exp04_05_console_build_success.png`: Console Output page ending in `BUILD SUCCESS` and `Finished: SUCCESS`.
+- [ ] `exp04_06_test_result_trend.png`: Jenkins Test Result Trend graph showing 17 passed tests with 0 failures.
 
 ---
 
-## 9. Common Errors and Troubleshooting
+## 8. Common Errors and Troubleshooting
 
-| Error | Root Cause | Solution |
+| Error Encountered | Root Cause | Exact Solution |
 |:---|:---|:---|
-| `Cannot run program "mvn"` | Maven tool was not selected in the job configuration or `MAVEN_HOME` is invalid. | Ensure **Invoke top-level Maven targets** has `Maven-3.9.6` selected in dropdown, or add Maven's `bin/` directory to system PATH. |
-| `java.lang.UnsupportedClassVersionError: ... has been compiled by a more recent version` | Jenkins is executing Maven with JDK 8 or 11 while QueueLess requires Java 17+. | Configure `JDK-17` in Jenkins Global Tool Configuration and select it in the Job Configuration dropdown under JDK. |
-| `Failed to connect to repository ... Host key verification failed` | SSH keys missing or host not trusted. | Use HTTPS repository URL with Personal Access Token credentials, or add GitHub's host key to `known_hosts`. |
-| Port conflict on 8080 | Another service is using port 8080. | Launch Jenkins on an alternate port: `java -jar jenkins.war --httpPort=8090`. (Note: QueueLess runs on port 8085 to avoid this exact conflict). |
+| `The filename, directory name, or volume label syntax is incorrect` | Shell command syntax entered instead of Windows batch. | Select **Execute Windows batch command** (not Execute shell), and use `call mvnw.cmd`. |
+| `Error: JAVA_HOME not found in your environment` | Jenkins Windows service runs under `LocalSystem` without user environment variables. | QueueLess's updated `mvnw.cmd` automatically auto-detects `C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot`. |
+| `Cannot connect to repository: Permission denied` | Private repository with missing credentials. | Generate a GitHub Personal Access Token (classic) with `repo` scope and configure it under Jenkins Credentials. |
+| `Port 8080 was already in use` | Trying to run Spring Boot on 8080 while Jenkins uses 8080. | QueueLess is explicitly pre-configured to port **8085** to eliminate port collisions. |
 
 ---
 
-## 10. Student Experiment Result Record
+## 9. Student Experiment Result Record
 
 **Date of Execution:** ___________________  
 **Student Name:** _______________________  
@@ -159,23 +191,23 @@ Get-ChildItem -Path "target\surefire-reports\*.xml" | Select-Object Name, Length
 **Staff Signature:** ____________________  
 
 **Result:**  
-Jenkins CI server installation, tool configuration (JDK 17 and Maven 3.9), Git repository integration, and Freestyle automated build execution were successfully implemented. The automated build completed with all 17 unit/integration test cases passing.
+A Jenkins Freestyle job named `QueueLess-Build` was successfully created and connected to GitHub repository `https://github.com/Gokul7176/QueueLess.git`. Automated source checkout, compilation, test execution using `mvnw.cmd`, and JUnit test report publication were verified with zero failures.
 
 ---
 
-## 11. Viva Questions and Answers
+## 10. Viva Questions and Answers
 
-1. **What is Continuous Integration (CI)?**  
-   *Answer:* Continuous Integration is a software development practice where developers merge their code changes into a central repository frequently (multiple times a day), after which automated builds and test suites execute immediately to detect integration errors early.
+1. **What is the difference between a Jenkins Freestyle Project and a Jenkins Pipeline Project?**  
+   *Answer:* A Freestyle project is configured manually through the Jenkins GUI web forms and stores its configuration as an XML file on the Jenkins server. A Pipeline project is defined as code in a version-controlled `Jenkinsfile` (Pipeline-as-Code), allowing multi-stage workflows, parallel execution, and automated deployment pipelines tracked in Git.
 
-2. **What is the difference between a Jenkins Freestyle job and a Jenkins Pipeline job?**  
-   *Answer:* A Freestyle job is configured manually via the Jenkins web UI forms and lacks version control. A Pipeline job is defined as code in a version-controlled `Jenkinsfile` (Pipeline-as-Code), allowing complex multi-stage workflows, parallel execution, and tracking inside the Git repository.
+2. **Why do we use `call mvnw.cmd` instead of just `mvnw.cmd` in a Windows batch build step?**  
+   *Answer:* In Windows Command Prompt (`cmd.exe`), executing another `.cmd` or `.bat` script without the `call` keyword causes the parent batch process to transfer execution permanently to the target script and terminate immediately upon completion, skipping all subsequent Jenkins steps. `call` ensures execution returns to Jenkins.
 
-3. **What is the function of the Surefire plugin in a Jenkins Maven build?**  
-   *Answer:* The `maven-surefire-plugin` executes the unit and integration test suite during the `test` phase and generates structured XML test reports in `target/surefire-reports/`, which Jenkins parses to display graphical test status and pass/fail trends.
+3. **What is the function of the Maven Surefire plugin and where does it output test reports?**  
+   *Answer:* The `maven-surefire-plugin` executes JUnit test classes during the `test` phase. It outputs machine-readable XML test reports to `target/surefire-reports/*.xml`, containing execution duration, passed tests, and failure stack traces.
 
-4. **How does SCM Polling differ from Webhook triggers in Jenkins?**  
-   *Answer:* SCM Polling periodically checks the Git repository at scheduled intervals (e.g., every 5 minutes), generating unnecessary server load if no commits occurred. Webhooks push instant HTTP notifications from GitHub to Jenkins upon each `git push`, triggering builds immediately without polling delay.
+4. **How does Jenkins know whether a build has Succeeded or Failed?**  
+   *Answer:* Jenkins monitors the exit code returned by the executed process. An exit code of `0` indicates success. Any non-zero exit code (such as exit code `1` returned by Maven when compilation or unit tests fail) marks the build as `FAILURE`.
 
-5. **Where does Jenkins store the source code checked out during a build?**  
-   *Answer:* Jenkins stores checked-out code in the job's dedicated workspace directory: `$JENKINS_HOME/workspace/<job-name>/`.
+5. **Why is the Maven Wrapper (`mvnw.cmd`) preferred over installing global Maven on the Jenkins server?**  
+   *Answer:* The Maven Wrapper bundles the exact Maven version required by the application within the project repository. It eliminates tool version discrepancies between developer laptops, CI build servers, and Docker containers, ensuring fully reproducible builds without requiring administrative tool configuration on Jenkins.

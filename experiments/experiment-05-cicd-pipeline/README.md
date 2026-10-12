@@ -2,280 +2,198 @@
 
 **Course Code:** 23IT723 — DevOps Laboratory  
 **Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Pipeline Item Name:** `QueueLess-CICD`  
+**Target Repository:** `https://github.com/Gokul7176/QueueLess.git`  
+**Branch:** `main`  
+**Pipeline Script:** `Jenkinsfile`  
 
 ---
 
 ## 1. Aim
-To create a version-controlled, declarative `Jenkinsfile` defining a 7-stage Continuous Integration and Continuous Delivery (CI/CD) pipeline for QueueLess, automate code compilation, automated testing, artifact packaging, Docker containerization, local container deployment, and smoke-test health verification, and ensure failed stages abort deployment safely.
+To create, configure, and execute a complete 7-stage Continuous Integration and Continuous Delivery (CI/CD) Declarative Pipeline named `QueueLess-CICD` in Jenkins, pulling from `https://github.com/Gokul7176/QueueLess.git`, automating compilation, enforcing an automated test quality gate, packaging the Spring Boot fat JAR, building an immutable Docker container image, deploying the application container, verifying HTTP endpoint responsiveness, and archiving JUnit test reports.
 
 ---
 
 ## 2. Requirements & Prerequisites
-- **Operating System:** Windows 10/11 or Ubuntu Linux
-- **Software:** Jenkins 2.400+, Docker 24+, Java 17+, Maven 3.9+, Git 2.40+
-- **Jenkins Plugins:** Pipeline, Git, JUnit, Docker Pipeline
-- **Repository:** `C:\queuless` with `Jenkinsfile` committed to Git
-- **Target Deployment Port:** `8085`
+- **Operating System:** Windows 11 (Running Jenkins Windows Service at `http://localhost:8080`)
+- **Docker Engine:** Docker Desktop (v24.x+) running with Docker daemon active
+- **JDK:** OpenJDK 21 LTS (`C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot`)
+- **Build Tool:** Project Maven Wrapper (`mvnw.cmd`)
+- **Repository URL:** `https://github.com/Gokul7176/QueueLess.git`
+- **Deployment Host Port:** `8085` (default) or configurable to `8086` to avoid conflicts.
 
 ---
 
 ## 3. Theory
 
-### Pipeline as Code Concept:
-"Pipeline as Code" treats the delivery pipeline as first-class software. Instead of relying on manual point-and-click UI configurations, the entire CI/CD delivery lifecycle is described declaratively in a `Jenkinsfile` stored alongside application code in Git.
+### Declarative Pipeline as Code:
+In enterprise DevOps, Continuous Delivery pipelines are defined as version-controlled code inside a `Jenkinsfile` rather than configured via fragile web forms.
 
-### Advantages:
-1. **Version Controlled:** Changes to the build or deployment pipeline are reviewed via Git pull requests and rollbacks are instantaneous.
-2. **Reproducible:** Any team member or secondary Jenkins instance can recreate the build pipeline instantly.
-3. **Traceable:** Every deployment is tagged with its originating Git commit SHA.
-
-### 7-Stage Pipeline Architecture:
+### 7-Stage Architectural Pipeline Workflow:
 
 ```
-[ Git SCM ]
-     │
-     ▼
+[ GitHub: https://github.com/Gokul7176/QueueLess.git ]
+                           │
+                           ▼
 ┌────────────────────────────────────────────────────────┐
-│ Stage 1: Checkout Source Code                          │
-└───────────────────────────┬────────────────────────────┘
-                            ▼
+│ 1. CHECKOUT       : Clones repository commit on main   │
+└──────────────────────────┬─────────────────────────────┘
+                           ▼
 ┌────────────────────────────────────────────────────────┐
-│ Stage 2: Compile Application (mvn compile)             │
-└───────────────────────────┬────────────────────────────┘
-                            ▼
+│ 2. COMPILE        : Compiles source (call mvnw.cmd)    │
+└──────────────────────────┬─────────────────────────────┘
+                           ▼
 ┌────────────────────────────────────────────────────────┐
-│ Stage 3: Run Automated Tests (mvn test / JUnit 5)      │  ───► [Failed Test: Aborts Pipeline]
-└───────────────────────────┬────────────────────────────┘
-                            ▼
+│ 3. TEST           : Executes 17 JUnit 5 test cases     │ ───► [FAIL: Quality Gate HALTS Pipeline]
+└──────────────────────────┬─────────────────────────────┘
+                           ▼ (All Tests Pass)
 ┌────────────────────────────────────────────────────────┐
-│ Stage 4: Package Fat JAR (mvn package)                 │
-└───────────────────────────┬────────────────────────────┘
-                            ▼
+│ 4. PACKAGE        : Bundles target/queueless-1.0.0.jar │
+└──────────────────────────┬─────────────────────────────┘
+                           ▼
 ┌────────────────────────────────────────────────────────┐
-│ Stage 5: Build Docker Image (docker build -t queueless)│
-└───────────────────────────┬────────────────────────────┘
-                            ▼
+│ 5. DOCKER BUILD   : Builds image queueless:latest      │
+└──────────────────────────┬─────────────────────────────┘
+                           ▼
 ┌────────────────────────────────────────────────────────┐
-│ Stage 6: Deploy Container (docker run -p 8085:8085)    │
-└───────────────────────────┬────────────────────────────┘
-                            ▼
+│ 6. DEPLOY         : Launches container on Port 8085    │
+└──────────────────────────┬─────────────────────────────┘
+                           ▼
 ┌────────────────────────────────────────────────────────┐
-│ Stage 7: Verify Deployment (HTTP Healthcheck Curl)     │
+│ 7. VERIFY DEPLOY  : Polls http://localhost:8085/stats  │
 └────────────────────────────────────────────────────────┘
 ```
 
+### Safety Principles Implemented:
+1. **Automated Quality Gate:** If any test fails in Stage 3, the pipeline terminates immediately. Downstream packaging and Docker deployment stages are skipped, preventing defective code from reaching production.
+2. **Safe Container Management:** Stage 6 gracefully stops and removes existing containers with the same name (`docker stop queueless-app >nul 2>&1`), avoiding container name collision errors.
+3. **True Application Healthcheck:** Stage 7 polls the live Spring Boot REST API (`/api/tickets/stats`) using a retry loop, verifying that the embedded Tomcat server is listening and database transactions succeed.
+
 ---
 
-## 4. Pipeline Configuration Guide
+## 4. Step-by-Step Jenkins Configuration Guide
 
-### Step 1: Commit `Jenkinsfile` to Git
-Verify that the `Jenkinsfile` is committed in the root of the QueueLess repository:
-```powershell
-cd C:\queuless
-git status
+### Step 1: Open Jenkins Dashboard
+1. Open your browser and navigate to:
+   ```
+   http://localhost:8080/
+   ```
+2. Log in with your Jenkins credentials.
+
+### Step 2: Create the Pipeline Project
+1. Click **New Item** on the left dashboard menu.
+2. Enter item name: **`QueueLess-CICD`**.
+3. Select **Pipeline** (not Freestyle).
+4. Click **OK**.
+
+### Step 3: Configure Pipeline Parameters (Optional / Recommended)
+1. Check the box **This project is parameterized**.
+2. Click **Add Parameter** -> **String Parameter**:
+   - Name: `APP_PORT`
+   - Default Value: `8085`
+   - Description: `Host port to bind the QueueLess container (use 8086 if 8085 is in use)`
+3. Click **Add Parameter** -> **String Parameter**:
+   - Name: `CONTAINER_NAME`
+   - Default Value: `queueless-app`
+
+### Step 4: Configure Pipeline from SCM
+1. Scroll down to the **Pipeline** configuration section.
+2. In the **Definition** dropdown, select **Pipeline script from SCM**.
+3. In the **SCM** dropdown, select **Git**.
+4. In **Repository URL**, enter:
+   ```
+   https://github.com/Gokul7176/QueueLess.git
+   ```
+5. **Credentials:** Leave as `- none -` (for public repo) or select your GitHub Personal Access Token.
+6. **Branch Specifier:**
+   ```
+   */main
+   ```
+7. **Script Path:**
+   ```
+   Jenkinsfile
+   ```
+8. Click **Save** to complete project configuration.
+
+---
+
+## 5. Pipeline Execution & Stage Monitoring
+
+1. In the `QueueLess-CICD` project page, click **Build with Parameters** (or **Build Now**).
+2. Review the parameters (`APP_PORT=8085`, `CONTAINER_NAME=queueless-app`) and click **Build**.
+3. Under **Build History**, click **#1** to monitor progress.
+4. Click **Pipeline Console** to observe the real-time stage execution.
+
+### Expected Stage View Dashboard:
+
+```
+[1. Checkout]   [2. Compile]   [3. Test]   [4. Package]   [5. Docker Build]   [6. Deploy]   [7. Verify Deploy]
+    1.2s            8.4s         18.2s         3.1s             4.5s             2.1s              11.2s
+   SUCCESS         SUCCESS      SUCCESS       SUCCESS          SUCCESS          SUCCESS           SUCCESS
 ```
 
-### Step 2: Create Pipeline Job in Jenkins
-1. Open Jenkins at `http://localhost:8080`.
-2. Click **New Item**.
-3. Name: `QueueLess-CI-CD-Pipeline`.
-4. Select **Pipeline** (not Freestyle) and click **OK**.
+### Stage 7 Verification Output in Console Log:
+```text
+[Pipeline] { (7. Verify Deployment) }
+Verifying application health and responsiveness at http://localhost:8085/api/tickets/stats...
+[QueueLess-CICD] $ cmd /c powershell -NoProfile -ExecutionPolicy Bypass -Command ...
+Verification successful: {"success":true,"message":"Operation successful","data":{"waitingCount":2,"servingCount":1,"completedCount":1,"cancelledCount":0,"totalCount":4,"estimatedWaitMinutes":10}}
 
-### Step 3: Configure Pipeline from SCM
-1. Scroll down to the **Pipeline** configuration section.
-2. Under **Definition**, select **Pipeline script from SCM**.
-3. SCM: **Git**.
-4. Repository URL: Enter your GitHub repository URL (e.g., `https://github.com/<your-username>/queueless.git` or local path `file:///C:/queuless`).
-5. Credentials: Add your GitHub Personal Access Token credential if using private repository (never hardcode in Jenkinsfile).
-6. Branch Specifier: `*/main`.
-7. Script Path: `Jenkinsfile`.
-8. Click **Save**.
-
-### Step 4: Execute and Monitor Pipeline
-1. Click **Build Now**.
-2. Observe the **Stage View** visualization showing each stage sequentially:
-   - Green tiles indicate successful stage execution.
-   - Red tiles indicate stage failure (which immediately prevents execution of downstream deployment stages).
-
----
-
-## 5. Jenkinsfile Source Code Breakdown
-
-The version-controlled `Jenkinsfile` located in `C:\queuless\Jenkinsfile` contains:
-
-```groovy
-pipeline {
-    agent any
-
-    tools {
-        maven 'Maven-3.9.6'
-        jdk 'JDK-17'
-    }
-
-    environment {
-        APP_NAME = 'queueless'
-        APP_VERSION = '1.0.0'
-        IMAGE_NAME = 'queueless:latest'
-        CONTAINER_NAME = 'queueless-app'
-        APP_PORT = '8085'
-    }
-
-    options {
-        timeout(time: 20, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-        disableConcurrentBuilds()
-    }
-
-    stages {
-        stage('1. Checkout Source Code') {
-            steps {
-                echo 'Checking out latest commit from Git repository...'
-                checkout scm
-            }
-        }
-
-        stage('2. Compile Application') {
-            steps {
-                echo 'Compiling Java source code with Maven...'
-                script {
-                    if (isUnix()) { sh './mvnw compile' }
-                    else { bat 'mvnw.cmd compile' }
-                }
-            }
-        }
-
-        stage('3. Run Automated Tests') {
-            steps {
-                echo 'Running JUnit 5 unit and integration test suite...'
-                script {
-                    if (isUnix()) { sh './mvnw test' }
-                    else { bat 'mvnw.cmd test' }
-                }
-            }
-        }
-
-        stage('4. Package Fat JAR') {
-            steps {
-                echo 'Packaging executable Spring Boot fat JAR...'
-                script {
-                    if (isUnix()) { sh './mvnw package -DskipTests=true' }
-                    else { bat 'mvnw.cmd package -DskipTests=true' }
-                }
-            }
-        }
-
-        stage('5. Build Docker Image') {
-            steps {
-                echo "Building Docker container image: ${IMAGE_NAME}..."
-                script {
-                    if (isUnix()) { sh "docker build -t ${IMAGE_NAME} ." }
-                    else { bat "docker build -t ${IMAGE_NAME} ." }
-                }
-            }
-        }
-
-        stage('6. Deploy Container') {
-            steps {
-                echo "Deploying container ${CONTAINER_NAME} on port ${APP_PORT}..."
-                script {
-                    if (isUnix()) {
-                        sh """
-                            docker stop ${CONTAINER_NAME} || true
-                            docker rm ${CONTAINER_NAME} || true
-                            docker run -d -p ${APP_PORT}:8085 --name ${CONTAINER_NAME} ${IMAGE_NAME}
-                        """
-                    } else {
-                        bat """
-                            docker stop ${CONTAINER_NAME} || verify > nul
-                            docker rm ${CONTAINER_NAME} || verify > nul
-                            docker run -d -p ${APP_PORT}:8085 --name ${CONTAINER_NAME} ${IMAGE_NAME}
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('7. Verify Deployment') {
-            steps {
-                echo "Verifying deployment health at http://localhost:${APP_PORT}/api/tickets/stats..."
-                sleep time: 10, unit: 'SECONDS'
-                script {
-                    if (isUnix()) {
-                        sh "curl -f -s http://localhost:${APP_PORT}/api/tickets/stats || exit 1"
-                    } else {
-                        bat "powershell -Command \"Invoke-RestMethod -Uri 'http://localhost:${APP_PORT}/api/tickets/stats' -Method Get\""
-                    }
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
-            archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true
-        }
-        success {
-            echo "SUCCESS: QueueLess v${APP_VERSION} was successfully built, tested, and deployed!"
-        }
-        failure {
-            echo "FAILURE: QueueLess CI/CD pipeline failed. Inspect the console logs above for diagnostics."
-        }
-    }
-}
+[Pipeline] stage
+[Pipeline] { (Declarative: Post Actions) }
+Recording test results
+Archiving artifacts
+========================================================================
+SUCCESS: QueueLess v1.0.0 was successfully built, tested, and deployed!
+Access URL: http://localhost:8085/
+========================================================================
+Finished: SUCCESS
 ```
 
 ---
 
 ## 6. Actual Verification Method
 
-1. **Stage View Matrix:** Verify in the Jenkins UI that all 7 stages turn bright green with elapsed times.
-2. **Artifact Archiving:** Confirm that `target/queueless-1.0.0.jar` is listed under "Last Successful Artifacts".
-3. **Container State:** Open terminal and run `docker ps --filter "name=queueless-app"`. Confirm `STATUS` is `Up` and `healthy`.
-4. **Smoke Test:** Query the deployed container directly:
+1. **Jenkins Stage View:** All 7 stages display bright green tiles indicating success.
+2. **Docker Container Verification:**
+   ```powershell
+   docker ps --filter "name=queueless-app"
+   ```
+   Output confirms `STATUS: Up (healthy)` and port mapping `0.0.0.0:8085->8085/tcp`.
+3. **Application Verification:** Open `http://localhost:8085` in Google Chrome and verify that the QueueLess home page is live.
+4. **API Verification:**
    ```powershell
    Invoke-RestMethod -Uri "http://localhost:8085/api/tickets/stats" -Method Get
    ```
-5. **Failure Safety Test:** Introduce an intentional test assertion failure in `QueueServiceTest.java`. Trigger a build and verify that the pipeline terminates immediately at **Stage 3 (Automated Tests)**, preventing Stages 4, 5, 6, and 7 from running.
+5. **Quality Gate Halt Test:** Introduce an assertion failure in `QueueServiceTest.java`. Trigger a build. Confirm that the pipeline turns red at Stage 3 (**Test**) and that Stages 4, 5, 6, and 7 are automatically skipped.
 
 ---
 
-## 7. Expected Result vs. Observed Result
+## 7. Screenshot Checklist
 
-- **Expected Result:**  
-  The Jenkins Declarative Pipeline executes all 7 stages without manual intervention. Docker image `queueless:latest` is built and container `queueless-app` is spawned on port 8085. Stage 7 HTTP smoke test responds with HTTP 200.
+Capture these visual evidence items for your laboratory record:
 
-- **Observed Result:**  
-  Pipeline completed in 1 min 14 sec across all 7 stages.
-  Healthcheck verification responded:
-  ```json
-  {"success":true,"message":"Operation successful","data":{"waitingCount":2,"servingCount":1,"completedCount":1,"cancelledCount":0,"totalCount":4,"estimatedWaitMinutes":10}}
-  ```
-
----
-
-## 8. Screenshot Checklist
-
-- [ ] `exp05_01_pipeline_scm_config.png`: Jenkins Pipeline job configuration showing "Pipeline script from SCM" pointing to `Jenkinsfile`.
-- [ ] `exp05_02_stage_view_green.png`: Jenkins Pipeline Stage View showing all 7 green blocks (Checkout, Compile, Test, Package, Docker Build, Deploy, Verify).
-- [ ] `exp05_03_docker_build_log.png`: Console log snippet showing `docker build -t queueless:latest .`.
-- [ ] `exp05_04_healthcheck_verification.png`: Console log showing Stage 7 successful HTTP 200 response.
-- [ ] `exp05_05_failure_halt_safety.png`: Stage View showing a failed test halting the pipeline at Stage 3 while Deploy is skipped.
+- [ ] `exp05_01_pipeline_job_creation.png`: New Item page showing `QueueLess-CICD` selected as Pipeline.
+- [ ] `exp05_02_pipeline_scm_config.png`: Pipeline script from SCM configuration pointing to `https://github.com/Gokul7176/QueueLess.git` and `Jenkinsfile`.
+- [ ] `exp05_03_stage_view_7_green.png`: Jenkins Pipeline Stage View matrix showing all 7 green blocks with execution durations.
+- [ ] `exp05_04_docker_build_log.png`: Console output snippet showing `docker build -t queueless:latest .`.
+- [ ] `exp05_05_deploy_verification_log.png`: Console output showing Stage 7 PowerShell healthcheck returning `"success":true`.
+- [ ] `exp05_06_quality_gate_halt.png`: Stage View showing a failed test halting the pipeline at Stage 3 while Deploy is skipped.
 
 ---
 
-## 9. Common Errors and Troubleshooting
+## 8. Common Errors and Troubleshooting
 
 | Error | Root Cause | Solution |
 |:---|:---|:---|
-| `docker: command not found` inside Jenkins agent | Jenkins service user lacks PATH to `docker.exe` or Docker Desktop is running under a different user context. | Ensure Docker Desktop is running, add Docker CLI directory to system PATH, and ensure Jenkins service has permissions to access the Docker pipe. |
-| Stage 7 Fails with `Connection refused` | Spring Boot took longer than 10 seconds to bootstrap inside the container. | Increase the sleep duration in Stage 7 (`sleep time: 15, unit: 'SECONDS'`) to allow full Tomcat initialization. |
-| `Cannot bind to port 8085: address already in use` | A previously orphaned container or local process is holding port 8085. | Stage 6 includes `docker stop queueless-app || true` and `docker rm queueless-app || true`. If a host process holds the port, terminate it using `Stop-Process -Id <PID>`. |
-| Hardcoded secrets warning in security audit | GitHub tokens or passwords stored in cleartext. | Use Jenkins Credentials Store: `withCredentials([usernamePassword(credentialsId: 'github-cred', ...)])`. |
+| `docker is not recognized as an internal or external command` | Docker CLI not found by Jenkins agent user. | Ensure Docker Desktop is running and `C:\Program Files\Docker\Docker\resources\bin` is added to system PATH. |
+| Stage 7 Fails with `Connection refused` | Spring Boot took longer than 10 seconds to warm up. | Stage 7 includes a 5-iteration retry loop with 3-second intervals to allow full embedded Tomcat bootstrap. |
+| `Bind for 0.0.0.0:8085 failed: port is already allocated` | Another local process or container holds port 8085. | Pass build parameter `APP_PORT=8086` when clicking **Build with Parameters**, or stop the conflicting container. |
+| `ERROR: Could not find ... in Global Tool Configuration` | Missing global tool definitions. | The QueueLess `Jenkinsfile` uses the self-contained project Maven Wrapper (`mvnw.cmd`), requiring zero manual tool configuration in Jenkins. |
 
 ---
 
-## 10. Student Experiment Result Record
+## 9. Student Experiment Result Record
 
 **Date of Execution:** ___________________  
 **Student Name:** _______________________  
@@ -283,23 +201,26 @@ pipeline {
 **Staff Signature:** ____________________  
 
 **Result:**  
-A complete 7-stage Continuous Integration and Continuous Delivery (CI/CD) declarative pipeline was created, committed to version control in `Jenkinsfile`, and executed. Automated testing, packaging, containerization, local deployment, and health verification were fully validated.
+A production-grade 7-stage CI/CD Declarative Pipeline named `QueueLess-CICD` was created and executed in Jenkins. Automated Git checkout, compilation, JUnit 5 continuous testing, artifact packaging, Docker containerization, local container deployment, and HTTP healthcheck smoke testing were successfully demonstrated and validated.
 
 ---
 
-## 11. Viva Questions and Answers
+## 10. Viva Questions and Answers
 
-1. **What is the difference between Declarative and Scripted Pipeline syntax in Jenkins?**  
-   *Answer:* Declarative Pipeline uses a strict, structured, opinionated syntax enclosed in a `pipeline { ... }` block with predefined sections (`stages`, `agent`, `post`, `environment`), making it easier to read and maintain. Scripted Pipeline uses a Groovy DSL enclosed in `node { ... }` blocks with unrestricted programmatic logic, offering higher flexibility at the cost of complexity.
+1. **What is "Pipeline as Code" and why is it superior to manual Jenkins configuration?**  
+   *Answer:* Pipeline as Code means defining the software delivery pipeline in a version-controlled text file (`Jenkinsfile`) stored in the project repository. It provides version history, pull-request code reviews for build modifications, instant disaster recovery, and reproducible CI/CD across environments.
 
-2. **What is the purpose of the `post` section in a Declarative Pipeline?**  
-   *Answer:* The `post` section defines actions that execute automatically after all stages complete, conditional on the build outcome (`always`, `success`, `failure`, `unstable`, `aborted`). It is typically used for test report publishing, artifact archiving, and email/chat notifications.
+2. **What is an "Automated Quality Gate" in Continuous Integration?**  
+   *Answer:* A quality gate is an automated enforcement point in the pipeline (such as automated unit/integration tests or code coverage checks). If any test fails, the quality gate immediately fails the build and aborts all subsequent stages, ensuring that broken code is never packaged, containerized, or deployed.
 
-3. **Why must automated tests run before the Docker packaging stage?**  
-   *Answer:* Running tests before packaging adheres to the "Fail Fast" principle. If a defect or regression exists, the build halts immediately, saving compute resources, avoiding unnecessary Docker image generation, and preventing broken artifacts from entering container registries.
+3. **How does the Declarative Pipeline handle multi-platform agents (Windows vs Linux)?**  
+   *Answer:* The Declarative Pipeline uses the Groovy `isUnix()` condition inside a `script { ... }` block. If `isUnix()` is true, it executes shell scripts (`sh`); if false (such as on a Windows host), it executes Windows batch commands (`bat 'call mvnw.cmd ...'`).
 
-4. **What does the `timeout` option do in Jenkinsfile?**  
-   *Answer:* The `timeout` directive terminates a pipeline build if it exceeds a specified duration (e.g., 20 minutes), preventing rogue hanging processes or network deadlock from permanently tying up Jenkins executor slots.
+4. **Why is an application-level healthcheck (`/api/tickets/stats`) better than just checking `docker ps`?**  
+   *Answer:* A container can be in the `running` state even if the application inside has crashed (e.g., Spring Boot failed to connect to database or crashed during Tomcat startup). An application-level HTTP healthcheck queries the live REST API, confirming that the entire application stack is truly functional.
 
-5. **How does Continuous Delivery (CD) differ from Continuous Deployment?**  
-   *Answer:* In Continuous Delivery, every commit that passes automated testing is automatically packaged and deployed to a staging/testing environment, but production deployment requires a manual approval gate. In Continuous Deployment, every passing build is deployed to production automatically without human intervention.
+5. **What is the difference between Continuous Integration, Continuous Delivery, and Continuous Deployment?**  
+   *Answer:*  
+   - **Continuous Integration (CI):** Automates building and testing code on every commit.  
+   - **Continuous Delivery (CD):** Automatically packages and deploys passing builds to testing/staging environments, requiring a manual trigger to release to production.  
+   - **Continuous Deployment:** Automatically releases every passing build directly to production with zero manual intervention.
