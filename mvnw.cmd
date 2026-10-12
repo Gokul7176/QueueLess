@@ -58,6 +58,18 @@ set ERROR_CODE=0
 @setlocal
 
 @REM ==== START VALIDATION ====
+@REM Auto-detect JAVA_HOME if not explicitly set in environment
+if "%JAVA_HOME%" == "" (
+  if exist "C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin\java.exe" (
+    set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"
+  )
+)
+if "%JAVA_HOME%" == "" (
+  for /f "tokens=*" %%i in ('where java.exe 2^>nul') do (
+    if exist "%%~dpi..\bin\java.exe" set "JAVA_HOME=%%~dpi.."
+  )
+)
+
 if not "%JAVA_HOME%" == "" goto OkJHome
 
 echo.
