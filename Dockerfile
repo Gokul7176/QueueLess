@@ -22,8 +22,8 @@ WORKDIR /app
 # Create persistent data directory for H2 database
 RUN mkdir -p /app/data && chown -R appuser:appgroup /app
 
-# Copy the application JAR artifact into the runtime container
-COPY target/*.jar app.jar
+# Copy the executable Spring Boot application JAR into the runtime container
+COPY target/queueless-1.1.0.jar app.jar
 
 # Ensure proper ownership of application files
 RUN chown -R appuser:appgroup /app
