@@ -64,6 +64,11 @@ Software Configuration Management is the discipline of maintaining systems, soft
 
 ### File 1: `ansible/inventory.ini`
 ```ini
+# ==============================================================================
+# QueueLess — Ansible Inventory File
+# College DevOps Laboratory Project — 23IT723 (Experiment 10)
+# ==============================================================================
+
 [local]
 # Local deployment target using Ubuntu on WSL2
 localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3
@@ -75,50 +80,71 @@ localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
 app_name=queueless
-app_version=1.0.0
+app_version=1.1.0
 app_port=8085
 container_name=queueless-app
-image_name=queueless:latest
+image_name=queueless:1.1.0-8b8297d
 deploy_dir=/opt/queueless
 ```
 
 ### File 2: `ansible/deploy.yml`
 ```yaml
 ---
+# ==============================================================================
+# QueueLess — Ansible Deployment Playbook
+# College DevOps Laboratory Project — 23IT723 (Experiment 10)
+# Automates host provisioning, Docker setup, container lifecycle & verification
+# ==============================================================================
+
 - name: Deploy QueueLess Virtual Queue Management Application
   hosts: all
   become: yes
   vars:
     app_name: queueless
-    app_version: "1.0.0"
+    app_version: "1.1.0"
     app_port: 8085
     container_port: 8085
     container_name: queueless-app
-    image_name: "queueless:latest"
+    image_name: "queueless:1.1.0-8b8297d"
     deploy_dir: /opt/queueless
     health_check_url: "http://localhost:{{ app_port }}/api/tickets/stats"
+    version_check_url: "http://localhost:{{ app_port }}/api/version-history/current"
+    release_token: "{{ lookup('ansible.builtin.env', 'RELEASE_TRACKER_TOKEN') | default(release_tracker_token | default(''), true) }}"
 
   tasks:
+    # --------------------------------------------------------------------------
+    # Task 1: Verify Host Connectivity
+    # --------------------------------------------------------------------------
     - name: Test connectivity to target node
       ansible.builtin.ping:
 
+    # --------------------------------------------------------------------------
+    # Task 2: Create Deployment Directory Structure
+    # --------------------------------------------------------------------------
     - name: Create application deployment directory
       ansible.builtin.file:
         path: "{{ deploy_dir }}"
         state: directory
         mode: '0755'
 
+    # --------------------------------------------------------------------------
+    # Task 3: Ensure System Dependencies & Prerequisites
+    # --------------------------------------------------------------------------
     - name: Install required system packages
       ansible.builtin.apt:
         name:
           - curl
           - ca-certificates
           - python3
+          - python3-pip
           - docker.io
         state: present
         update_cache: yes
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
+    # --------------------------------------------------------------------------
+    # Task 4: Ensure Docker Daemon is Active
+    # --------------------------------------------------------------------------
     - name: Ensure Docker daemon service is started and enabled
       ansible.builtin.service:
         name: docker
@@ -126,6 +152,39 @@ deploy_dir=/opt/queueless
         enabled: yes
       ignore_errors: yes
 
+    # --------------------------------------------------------------------------
+    # Task 5: Pre-flight Safety Check (Token Discovery & No-Log Protection)
+    # --------------------------------------------------------------------------
+    - name: Query existing container for RELEASE_TRACKER_TOKEN if unset in environment
+      ansible.builtin.shell: >
+        docker inspect {{ container_name }} --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^RELEASE_TRACKER_TOKEN=' | head -n 1 | cut -d= -f2- || true
+      register: container_env_token
+      when: release_token | length == 0
+      failed_when: false
+      changed_when: false
+      check_mode: false
+      no_log: true
+
+    - name: Establish effective release token
+      ansible.builtin.set_fact:
+        effective_release_token: "{{ release_token if (release_token | length > 0) else (container_env_token.stdout | default('')) }}"
+      no_log: true
+
+    - name: Validate that effective release token is present
+      ansible.builtin.assert:
+        that:
+          - effective_release_token is defined
+          - effective_release_token | length > 0
+        fail_msg: >
+          CRITICAL: RELEASE_TRACKER_TOKEN is not supplied in the environment and could not be discovered from the active container.
+          To prevent creating an unauthenticated release environment, supply the token securely via:
+          export RELEASE_TRACKER_TOKEN='...' or passing --extra-vars "release_tracker_token=..." with no_log.
+        quiet: yes
+      no_log: true
+
+    # --------------------------------------------------------------------------
+    # Task 6: Stop and Remove Existing Container (Preserving Volume)
+    # --------------------------------------------------------------------------
     - name: Stop and remove existing QueueLess container if present
       ansible.builtin.command:
         cmd: "docker rm -f {{ container_name }}"
@@ -133,6 +192,9 @@ deploy_dir=/opt/queueless
       failed_when: false
       changed_when: remove_container_result.rc == 0
 
+    # --------------------------------------------------------------------------
+    # Task 7: Run Application Container with Persistent Storage and Secure Token
+    # --------------------------------------------------------------------------
     - name: Start QueueLess container
       ansible.builtin.command:
         cmd: >
@@ -140,15 +202,24 @@ deploy_dir=/opt/queueless
           --name {{ container_name }}
           --restart unless-stopped
           -p {{ app_port }}:{{ container_port }}
+          -v queueless-data:/app/data
           -e SERVER_PORT={{ container_port }}
+          -e RELEASE_TRACKER_TOKEN={{ effective_release_token }}
           {{ image_name }}
       register: docker_run_result
       changed_when: docker_run_result.rc == 0
+      no_log: true
 
+    # --------------------------------------------------------------------------
+    # Task 8: Wait for Application Warm-up
+    # --------------------------------------------------------------------------
     - name: Pause 10 seconds for Spring Boot container bootstrap
       ansible.builtin.pause:
         seconds: 10
 
+    # --------------------------------------------------------------------------
+    # Task 9: Healthcheck Smoke Test
+    # --------------------------------------------------------------------------
     - name: Verify application endpoint is healthy
       ansible.builtin.uri:
         url: "{{ health_check_url }}"
@@ -160,14 +231,34 @@ deploy_dir=/opt/queueless
       delay: 5
       until: health_check.status == 200
 
+    # --------------------------------------------------------------------------
+    # Task 10: Verify Version History Endpoint
+    # --------------------------------------------------------------------------
+    - name: Verify Version History endpoint reports active release
+      ansible.builtin.uri:
+        url: "{{ version_check_url }}"
+        method: GET
+        status_code: 200
+        return_content: yes
+      register: version_check
+      retries: 5
+      delay: 3
+      until: version_check.status == 200
+
+    # --------------------------------------------------------------------------
+    # Task 11: Output Deployment Summary
+    # --------------------------------------------------------------------------
     - name: Display deployment success information
       ansible.builtin.debug:
         msg:
           - "=========================================================="
           - "QueueLess Application Deployment Successful!"
           - "Container Name : {{ container_name }}"
+          - "Image Tag      : {{ image_name }}"
           - "Access URL     : http://localhost:{{ app_port }}/"
           - "Health Status  : {{ health_check.json.message | default('OK') }}"
+          - "Active Release : {{ version_check.json.data.deploymentId | default('N/A') }}"
+          - "Git Commit     : {{ version_check.json.data.gitCommitShort | default('N/A') }}"
           - "=========================================================="
 ```
 
@@ -202,7 +293,14 @@ ls -la
 
 ### Step 5: Test Node Ping Connectivity
 ```bash
-ansible -i inventory.ini all -m ping
+ansible -i inventory.ini local -m ping
+```
+*Observed Output:*
+```json
+localhost | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
 ```
 
 ### Step 6: Validate Playbook Syntax
@@ -210,42 +308,132 @@ Before executing, check that YAML indentation and module parameters are valid:
 ```bash
 ansible-playbook -i inventory.ini deploy.yml --syntax-check
 ```
+*Observed Output:*
+```text
+playbook: deploy.yml
+```
 
 ### Step 7: Execute Playbook Dry Run (Check Mode)
 ```bash
 ansible-playbook -i inventory.ini deploy.yml --check
+```
+*Observed Output:*
+```text
+PLAY RECAP *********************************************************************
+localhost                  : ok=10   changed=0    unreachable=0    failed=0    skipped=4    rescued=0    ignored=0
 ```
 
 ### Step 8: Execute Deployment Playbook
 ```bash
 ansible-playbook -i inventory.ini deploy.yml
 ```
+*Observed Output:*
+```text
+TASK [Display deployment success information] **********************************
+ok: [localhost] => {
+    "msg": [
+        "==========================================================",
+        "QueueLess Application Deployment Successful!",
+        "Container Name : queueless-app",
+        "Image Tag      : queueless:1.1.0-8b8297d",
+        "Access URL     : http://localhost:8085/",
+        "Health Status  : Operation successful",
+        "Active Release : QueueLess-CICD-7",
+        "Git Commit     : 8b8297d",
+        "=========================================================="
+    ]
+}
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=14   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+```
 
 ---
 
 ## 6. Actual Verification Method
 
-1. Check terminal output: Confirm that Ansible reports `failed=0` in the **PLAY RECAP**:
-   ```
+1. **Verify Ansible Play Recap**:
+   Ansible reports `failed=0`, `unreachable=0`, and `changed=2` (container replacement and start):
+   ```text
    PLAY RECAP *********************************************************************
-   localhost                  : ok=9    changed=4    unreachable=0    failed=0
+   localhost                  : ok=14   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
    ```
-2. Verify container state: Run `docker ps --filter "name=queueless-app"`.
-3. Verify application health:
+
+2. **Verify Container State**:
+   ```bash
+   docker ps --filter "name=queueless-app"
+   ```
+   *Observed Container State:*
+   ```text
+   CONTAINER ID   IMAGE                     STATUS                    PORTS                                         NAMES
+   29ea59ae2cae   queueless:1.1.0-8b8297d   Up 23 seconds (healthy)   0.0.0.0:8085->8085/tcp, [::]:8085->8085/tcp   queueless-app
+   ```
+
+3. **Verify Application Health & Active Queue State**:
    ```bash
    curl -s http://localhost:8085/api/tickets/stats
    ```
-4. Confirm in web browser by loading `http://localhost:8085`.
+   *Observed Response:*
+   ```json
+   {
+     "success": true,
+     "message": "Operation successful",
+     "data": {
+       "waitingCount": 2,
+       "servingCount": 1,
+       "completedCount": 1,
+       "cancelledCount": 0,
+       "totalCount": 4,
+       "estimatedWaitMinutes": 10
+     }
+   }
+   ```
+
+4. **Verify Active Version History Endpoint**:
+   ```bash
+   curl -s http://localhost:8085/api/version-history/current
+   ```
+   *Observed Response:*
+   ```json
+   {
+     "success": true,
+     "message": "Operation successful",
+     "data": {
+       "version": "1.1.0",
+       "gitCommit": "8b8297d02712ef89e21caff5f3d0baf5c1a2669c",
+       "gitCommitShort": "8b8297d",
+       "gitBranch": "origin/main",
+       "commitMessage": "fix(pipeline): sanitize json release metadata and secure process token passing",
+       "jenkinsBuildNumber": "7",
+       "jenkinsBuildUrl": "http://localhost:8080/job/QueueLess-CICD/7/",
+       "testResult": "PASSED (31/31 tests)",
+       "deploymentStatus": "VERIFIED",
+       "environment": "production",
+       "dockerImageTag": "queueless:1.1.0-8b8297d",
+       "pipelineJob": "QueueLess-CICD",
+       "deploymentId": "QueueLess-CICD-7",
+       "deployed": true
+     }
+   }
+   ```
+
+5. **Verify Database Persistence (`queueless-data`)**:
+   Querying `GET /api/version-history` confirms that all previously recorded releases (Build #1 and Jenkins Build #7) remain preserved across container replacement without data loss.
+
+6. **Verify Token Security & Release Authentication**:
+   - Unauthorized POST to `/api/version-history` with an invalid token returns `HTTP 401 Unauthorized: Invalid or missing release authentication token`.
+   - Authorized POST with valid `RELEASE_TRACKER_TOKEN` returns `HTTP 200/201 Success: Release deployment record successfully recorded`.
+   - Security enforced: No secret tokens are hardcoded, printed to stdout, or recorded in Ansible logs (`no_log: true`).
 
 ---
 
 ## 7. Expected Result vs. Observed Result
 
 - **Expected Result:**
-  Ansible connects to target node, creates `/opt/queueless`, verifies Docker daemon, launches `queueless-app`, waits 10s, queries healthcheck endpoint with HTTP 200, and displays the success debug banner with `failed=0`.
+  Ansible connects to the local target node via Ubuntu WSL2, verifies system packages and Docker daemon, validates the presence of `RELEASE_TRACKER_TOKEN`, re-creates `queueless-app` using the versioned Docker image `queueless:1.1.0-8b8297d` while preserving persistent volume `queueless-data`, verifies application health (`/api/tickets/stats`) and version monitoring (`/api/version-history/current`), and reports `failed=0`.
 
 - **Observed Result:**
-  Playbook syntax validation passed (`playbook: deploy.yml`). Play executed with 9 tasks `ok`, 0 failed. Deployed container verified responsive at `http://localhost:8085/`.
+  Playbook syntax validation passed (`playbook: deploy.yml`). Dry-run check mode passed with `ok=10`, `skipped=4`, `failed=0`. Full deployment executed cleanly with `ok=14`, `changed=2`, `failed=0`. The container booted in 10 seconds, health check returned HTTP 200, version history returned active release `QueueLess-CICD-7` (commit `8b8297d`), persistent queue data was preserved, and release-tracking security remained fully functional.
 
 ---
 

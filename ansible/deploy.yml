@@ -14,10 +14,11 @@
     app_port: 8085
     container_port: 8085
     container_name: queueless-app
-    image_name: "queueless:latest"
+    image_name: "queueless:1.1.0-8b8297d"
     deploy_dir: /opt/queueless
     health_check_url: "http://localhost:{{ app_port }}/api/tickets/stats"
     version_check_url: "http://localhost:{{ app_port }}/api/version-history/current"
+    release_token: "{{ lookup('ansible.builtin.env', 'RELEASE_TRACKER_TOKEN') | default(release_tracker_token | default(''), true) }}"
 
   tasks:
     # --------------------------------------------------------------------------
@@ -48,7 +49,7 @@
           - docker.io
         state: present
         update_cache: yes
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     # --------------------------------------------------------------------------
     # Task 4: Ensure Docker Daemon is Active
@@ -61,7 +62,37 @@
       ignore_errors: yes
 
     # --------------------------------------------------------------------------
-    # Task 5: Check Pre-existing Container
+    # Task 5: Pre-flight Safety Check (Token Discovery & No-Log Protection)
+    # --------------------------------------------------------------------------
+    - name: Query existing container for RELEASE_TRACKER_TOKEN if unset in environment
+      ansible.builtin.shell: >
+        docker inspect {{ container_name }} --format '{% raw %}{{range .Config.Env}}{{println .}}{{end}}{% endraw %}' 2>/dev/null | grep '^RELEASE_TRACKER_TOKEN=' | head -n 1 | cut -d= -f2- || true
+      register: container_env_token
+      when: release_token | length == 0
+      failed_when: false
+      changed_when: false
+      check_mode: false
+      no_log: true
+
+    - name: Establish effective release token
+      ansible.builtin.set_fact:
+        effective_release_token: "{{ release_token if (release_token | length > 0) else (container_env_token.stdout | default('')) }}"
+      no_log: true
+
+    - name: Validate that effective release token is present
+      ansible.builtin.assert:
+        that:
+          - effective_release_token is defined
+          - effective_release_token | length > 0
+        fail_msg: >
+          CRITICAL: RELEASE_TRACKER_TOKEN is not supplied in the environment and could not be discovered from the active container.
+          To prevent creating an unauthenticated release environment, supply the token securely via:
+          export RELEASE_TRACKER_TOKEN='...' or passing --extra-vars "release_tracker_token=..." with no_log.
+        quiet: yes
+      no_log: true
+
+    # --------------------------------------------------------------------------
+    # Task 6: Stop and Remove Existing Container (Preserving Volume)
     # --------------------------------------------------------------------------
     - name: Stop and remove existing QueueLess container if present
       ansible.builtin.command:
@@ -71,7 +102,7 @@
       changed_when: remove_container_result.rc == 0
 
     # --------------------------------------------------------------------------
-    # Task 6: Run Application Container with Persistent Storage
+    # Task 7: Run Application Container with Persistent Storage and Secure Token
     # --------------------------------------------------------------------------
     - name: Start QueueLess container
       ansible.builtin.command:
@@ -82,19 +113,21 @@
           -p {{ app_port }}:{{ container_port }}
           -v queueless-data:/app/data
           -e SERVER_PORT={{ container_port }}
+          -e RELEASE_TRACKER_TOKEN={{ effective_release_token }}
           {{ image_name }}
       register: docker_run_result
       changed_when: docker_run_result.rc == 0
+      no_log: true
 
     # --------------------------------------------------------------------------
-    # Task 7: Wait for Application Warm-up
+    # Task 8: Wait for Application Warm-up
     # --------------------------------------------------------------------------
     - name: Pause 10 seconds for Spring Boot container bootstrap
       ansible.builtin.pause:
         seconds: 10
 
     # --------------------------------------------------------------------------
-    # Task 8: Verification & Smoke Test
+    # Task 9: Healthcheck Smoke Test
     # --------------------------------------------------------------------------
     - name: Verify application endpoint is healthy
       ansible.builtin.uri:
@@ -108,7 +141,21 @@
       until: health_check.status == 200
 
     # --------------------------------------------------------------------------
-    # Task 9: Output Deployment Summary
+    # Task 10: Verify Version History Endpoint
+    # --------------------------------------------------------------------------
+    - name: Verify Version History endpoint reports active release
+      ansible.builtin.uri:
+        url: "{{ version_check_url }}"
+        method: GET
+        status_code: 200
+        return_content: yes
+      register: version_check
+      retries: 5
+      delay: 3
+      until: version_check.status == 200
+
+    # --------------------------------------------------------------------------
+    # Task 11: Output Deployment Summary
     # --------------------------------------------------------------------------
     - name: Display deployment success information
       ansible.builtin.debug:
@@ -116,7 +163,9 @@
           - "=========================================================="
           - "QueueLess Application Deployment Successful!"
           - "Container Name : {{ container_name }}"
+          - "Image Tag      : {{ image_name }}"
           - "Access URL     : http://localhost:{{ app_port }}/"
           - "Health Status  : {{ health_check.json.message | default('OK') }}"
-          - "Waiting Count  : {{ health_check.json.data.waitingCount | default('N/A') }}"
+          - "Active Release : {{ version_check.json.data.deploymentId | default('N/A') }}"
+          - "Git Commit     : {{ version_check.json.data.gitCommitShort | default('N/A') }}"
           - "=========================================================="
