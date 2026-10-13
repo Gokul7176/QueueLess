@@ -233,6 +233,123 @@ pipeline {
                         commitMsg = commitMsg.split("\r")[0].trim()
                     }
 
+                    def testSummary = ""
+                    if (isUnix()) {
+                        testSummary = sh(returnStdout: true, script: '''
+                            reports_dir="target/surefire-reports"
+                            if [ ! -d "$reports_dir" ]; then
+                                echo "ERROR: Surefire reports directory not found: $reports_dir" >&2
+                                exit 1
+                            fi
+                            files=$(ls "$reports_dir"/TEST-*.xml 2>/dev/null || ls "$reports_dir"/*.xml 2>/dev/null)
+                            if [ -z "$files" ]; then
+                                echo "ERROR: No Surefire test report XML files found in $reports_dir" >&2
+                                exit 1
+                            fi
+                            awk '
+                            BEGIN {
+                                total = 0; failures = 0; errors = 0; skipped = 0; count = 0;
+                            }
+                            /<testsuite/ {
+                                count++;
+                                for (i = 1; i <= NF; i++) {
+                                    if ($i ~ /^tests=/) { match($i, /[0-9]+/); total += substr($i, RSTART, RLENGTH); }
+                                    if ($i ~ /^failures=/) { match($i, /[0-9]+/); failures += substr($i, RSTART, RLENGTH); }
+                                    if ($i ~ /^errors=/) { match($i, /[0-9]+/); errors += substr($i, RSTART, RLENGTH); }
+                                    if ($i ~ /^skipped=/) { match($i, /[0-9]+/); skipped += substr($i, RSTART, RLENGTH); }
+                                }
+                            }
+                            END {
+                                if (count == 0 || total == 0) {
+                                    print "ERROR: Zero tests found in Surefire reports" > "/dev/stderr";
+                                    exit 1;
+                                }
+                                if (failures > 0 || errors > 0) {
+                                    printf("ERROR: Test suite failed with %d failures and %d errors out of %d tests\\n", failures, errors, total) > "/dev/stderr";
+                                    exit 1;
+                                }
+                                passed = total - failures - errors - skipped;
+                                if (skipped > 0) {
+                                    printf("PASSED (%d/%d tests, %d skipped)\\n", passed, total, skipped);
+                                } else {
+                                    printf("PASSED (%d/%d tests)\\n", total, total);
+                                }
+                            }' $files
+                        ''').trim()
+                    } else {
+                        testSummary = powershell(returnStdout: true, script: '''
+                            $reportsDir = "target/surefire-reports"
+                            if (-not (Test-Path $reportsDir)) {
+                                Write-Error "Surefire reports directory not found: $reportsDir"
+                                exit 1
+                            }
+
+                            $files = Get-ChildItem -Path $reportsDir -Filter "TEST-*.xml" -ErrorAction SilentlyContinue
+                            if (-not $files -or $files.Count -eq 0) {
+                                $files = Get-ChildItem -Path $reportsDir -Filter "*.xml" -ErrorAction SilentlyContinue
+                            }
+                            if (-not $files -or $files.Count -eq 0) {
+                                Write-Error "No Surefire test report XML files found in $reportsDir"
+                                exit 1
+                            }
+
+                            $total = 0
+                            $failures = 0
+                            $errors = 0
+                            $skipped = 0
+
+                            foreach ($f in $files) {
+                                try {
+                                    [xml]$xml = Get-Content -LiteralPath $f.FullName -ErrorAction Stop
+                                } catch {
+                                    Write-Error "Failed to parse test report XML: $($f.FullName) - $($_.Exception.Message)"
+                                    exit 1
+                                }
+
+                                $suites = $xml.SelectNodes("//testsuite")
+                                if (-not $suites -or $suites.Count -eq 0) {
+                                    if ($xml.testsuite) {
+                                        $suites = @($xml.testsuite)
+                                    }
+                                }
+
+                                foreach ($suite in $suites) {
+                                    $testsAttr = $suite.GetAttribute("tests")
+                                    $failuresAttr = $suite.GetAttribute("failures")
+                                    $errorsAttr = $suite.GetAttribute("errors")
+                                    $skippedAttr = $suite.GetAttribute("skipped")
+
+                                    if ($testsAttr) { $total += [int]$testsAttr }
+                                    if ($failuresAttr) { $failures += [int]$failuresAttr }
+                                    if ($errorsAttr) { $errors += [int]$errorsAttr }
+                                    if ($skippedAttr) { $skipped += [int]$skippedAttr }
+                                }
+                            }
+
+                            if ($total -le 0) {
+                                Write-Error "Zero tests found across all Surefire reports in $reportsDir"
+                                exit 1
+                            }
+
+                            if ($failures -gt 0 -or $errors -gt 0) {
+                                Write-Error "Test suite failed with $failures failures and $errors errors out of $total tests"
+                                exit 1
+                            }
+
+                            $passed = $total - $failures - $errors - $skipped
+                            if ($skipped -gt 0) {
+                                "PASSED ({0}/{1} tests, {2} skipped)" -f $passed, $total, $skipped
+                            } else {
+                                "PASSED ({0}/{1} tests)" -f $total, $total
+                            }
+                        ''').trim()
+                    }
+
+                    if (!testSummary || !testSummary.startsWith("PASSED")) {
+                        error("Release metadata verification failed: invalid test result summary '${testSummary}'")
+                    }
+                    echo "Verified automated test results from Surefire reports: ${testSummary}"
+
                     def metadata = [
                         version: APP_VERSION,
                         gitCommit: env.GIT_COMMIT_HASH,
@@ -241,7 +358,7 @@ pipeline {
                         commitMessage: commitMsg,
                         jenkinsBuildNumber: env.BUILD_NUMBER,
                         jenkinsBuildUrl: env.BUILD_URL ?: ("http://localhost:8080/job/" + env.JOB_NAME + "/" + env.BUILD_NUMBER + "/"),
-                        testResult: "PASSED (31/31 tests)",
+                        testResult: testSummary,
                         deploymentStatus: "VERIFIED",
                         environment: TARGET_ENV_NAME,
                         dockerImageTag: VERSIONED_IMAGE_TAG,
