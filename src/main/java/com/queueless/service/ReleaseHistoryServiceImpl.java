@@ -46,6 +46,11 @@ public class ReleaseHistoryServiceImpl implements ReleaseHistoryService {
                 ? request.getDeploymentStatus().trim().toUpperCase()
                 : "DEPLOYED";
 
+        String commitMsg = request.getCommitMessage() != null ? request.getCommitMessage() : "";
+        if (commitMsg.length() > 2000) {
+            commitMsg = commitMsg.substring(0, 1997) + "...";
+        }
+
         Optional<ReleaseHistory> existingOpt = releaseHistoryRepository.findByDeploymentId(deploymentId);
         ReleaseHistory release;
 
@@ -55,7 +60,7 @@ public class ReleaseHistoryServiceImpl implements ReleaseHistoryService {
             release.setGitCommit(gitCommit);
             release.setGitCommitShort(gitCommitShort);
             release.setGitBranch(request.getGitBranch() != null ? request.getGitBranch() : "main");
-            release.setCommitMessage(request.getCommitMessage() != null ? request.getCommitMessage() : "");
+            release.setCommitMessage(commitMsg);
             release.setJenkinsBuildNumber(buildNum);
             release.setJenkinsBuildUrl(request.getJenkinsBuildUrl());
             release.setTestResult(request.getTestResult() != null ? request.getTestResult() : "PASSED");
@@ -70,7 +75,7 @@ public class ReleaseHistoryServiceImpl implements ReleaseHistoryService {
                     gitCommit,
                     gitCommitShort,
                     request.getGitBranch() != null ? request.getGitBranch() : "main",
-                    request.getCommitMessage() != null ? request.getCommitMessage() : "",
+                    commitMsg,
                     buildNum,
                     request.getJenkinsBuildUrl(),
                     request.getTestResult() != null ? request.getTestResult() : "PASSED",
@@ -87,7 +92,7 @@ public class ReleaseHistoryServiceImpl implements ReleaseHistoryService {
         if ("DEPLOYED".equalsIgnoreCase(status) || "VERIFIED".equalsIgnoreCase(status)) {
             List<ReleaseHistory> allReleases = releaseHistoryRepository.findAll();
             for (ReleaseHistory existing : allReleases) {
-                if (existing.isCurrent()) {
+                if (existing.isCurrent() && !existing.getDeploymentId().equals(deploymentId)) {
                     existing.setCurrent(false);
                     releaseHistoryRepository.save(existing);
                 }

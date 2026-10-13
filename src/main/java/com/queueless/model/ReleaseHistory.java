@@ -32,7 +32,7 @@ public class ReleaseHistory {
     @Column(nullable = false, length = 64)
     private String gitBranch;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, length = 2000)
     private String commitMessage;
 
     @Column(length = 32)

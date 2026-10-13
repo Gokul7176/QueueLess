@@ -44,12 +44,12 @@ pipeline {
                         env.GIT_COMMIT_HASH = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
                         env.GIT_COMMIT_SHORT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
                         env.GIT_BRANCH_NAME = env.GIT_BRANCH ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
-                        env.GIT_COMMIT_MSG = sh(returnStdout: true, script: 'git log -1 --pretty=%s').trim()
+                        env.GIT_COMMIT_MSG = sh(returnStdout: true, script: 'git log -1 --format=%s').trim()
                     } else {
-                        env.GIT_COMMIT_HASH = bat(returnStdout: true, script: '@git rev-parse HEAD').trim()
-                        env.GIT_COMMIT_SHORT = bat(returnStdout: true, script: '@git rev-parse --short HEAD').trim()
-                        env.GIT_BRANCH_NAME = env.GIT_BRANCH ?: bat(returnStdout: true, script: '@git rev-parse --abbrev-ref HEAD').trim()
-                        env.GIT_COMMIT_MSG = bat(returnStdout: true, script: '@git log -1 --pretty=%s').trim()
+                        env.GIT_COMMIT_HASH = powershell(returnStdout: true, script: '(git rev-parse HEAD).Trim()').trim()
+                        env.GIT_COMMIT_SHORT = powershell(returnStdout: true, script: '(git rev-parse --short HEAD).Trim()').trim()
+                        env.GIT_BRANCH_NAME = env.GIT_BRANCH ?: powershell(returnStdout: true, script: '(git rev-parse --abbrev-ref HEAD).Trim()').trim()
+                        env.GIT_COMMIT_MSG = powershell(returnStdout: true, script: '(git log -1 --format="%s").Trim()').trim()
                     }
                     env.VERSIONED_IMAGE_TAG = "${APP_NAME}:${APP_VERSION}-${env.GIT_COMMIT_SHORT}"
                     env.LATEST_IMAGE_TAG = "${APP_NAME}:latest"
@@ -142,41 +142,47 @@ pipeline {
             steps {
                 echo "Deploying container ${TARGET_CONTAINER} with image ${VERSIONED_IMAGE_TAG} on host port ${TARGET_PORT}..."
                 script {
-                    def releaseToken = ""
-                    try {
-                        withCredentials([string(credentialsId: 'queueless-release-token', variable: 'SECRET_TOKEN')]) {
-                            releaseToken = env.SECRET_TOKEN
-                        }
-                    } catch (Exception e) {
-                        try {
-                            withCredentials([string(credentialsId: 'RELEASE_TRACKER_TOKEN', variable: 'SECRET_TOKEN')]) {
-                                releaseToken = env.SECRET_TOKEN
-                            }
-                        } catch (Exception e2) {
-                            releaseToken = env.RELEASE_TRACKER_TOKEN ?: ""
+                    def deployAction = {
+                        if (isUnix()) {
+                            sh '''
+                                docker stop "${TARGET_CONTAINER}" 2>/dev/null || true
+                                docker rm "${TARGET_CONTAINER}" 2>/dev/null || true
+                                docker run -d -p "${TARGET_PORT}:8085" \
+                                    -v queueless-data:/app/data \
+                                    -e SERVER_PORT=8085 \
+                                    -e RELEASE_TRACKER_TOKEN \
+                                    --name "${TARGET_CONTAINER}" \
+                                    --restart unless-stopped \
+                                    "${VERSIONED_IMAGE_TAG}"
+                            '''
+                        } else {
+                            powershell '''
+                                where.exe docker >$null 2>&1
+                                docker stop $env:TARGET_CONTAINER 2>$null
+                                docker rm $env:TARGET_CONTAINER 2>$null
+                                docker run -d -p "${env:TARGET_PORT}:8085" `
+                                    -v queueless-data:/app/data `
+                                    -e SERVER_PORT=8085 `
+                                    -e RELEASE_TRACKER_TOKEN `
+                                    --name $env:TARGET_CONTAINER `
+                                    --restart unless-stopped `
+                                    $env:VERSIONED_IMAGE_TAG
+                            '''
                         }
                     }
 
-                    if (isUnix()) {
-                        sh """
-                            docker stop ${TARGET_CONTAINER} || true
-                            docker rm ${TARGET_CONTAINER} || true
-                            docker run -d -p ${TARGET_PORT}:8085 \
-                                -v queueless-data:/app/data \
-                                -e SERVER_PORT=8085 \
-                                -e RELEASE_TRACKER_TOKEN="${releaseToken}" \
-                                --name ${TARGET_CONTAINER} \
-                                --restart unless-stopped \
-                                ${VERSIONED_IMAGE_TAG}
-                        """
-                    } else {
-                        bat """
-                            @echo off
-                            where docker >nul 2>&1 || set "PATH=C:\\Users\\Lenovo\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin;%PATH%"
-                            docker stop ${TARGET_CONTAINER} >nul 2>&1 || verify >nul
-                            docker rm ${TARGET_CONTAINER} >nul 2>&1 || verify >nul
-                            docker run -d -p ${TARGET_PORT}:8085 -v queueless-data:/app/data -e SERVER_PORT=8085 -e RELEASE_TRACKER_TOKEN="${releaseToken}" --name ${TARGET_CONTAINER} --restart unless-stopped ${VERSIONED_IMAGE_TAG}
-                        """
+                    try {
+                        withCredentials([string(credentialsId: 'queueless-release-token', variable: 'RELEASE_TRACKER_TOKEN')]) {
+                            deployAction()
+                        }
+                    } catch (Exception e) {
+                        try {
+                            withCredentials([string(credentialsId: 'RELEASE_TRACKER_TOKEN', variable: 'RELEASE_TRACKER_TOKEN')]) {
+                                deployAction()
+                            }
+                        } catch (Exception e2) {
+                            deployAction()
+                        }
                     }
                 }
             }
@@ -219,51 +225,85 @@ pipeline {
             steps {
                 echo "Recording verified deployment metadata in QueueLess Version History..."
                 script {
-                    def releaseToken = ""
-                    try {
-                        withCredentials([string(credentialsId: 'queueless-release-token', variable: 'SECRET_TOKEN')]) {
-                            releaseToken = env.SECRET_TOKEN
-                        }
-                    } catch (Exception e) {
-                        try {
-                            withCredentials([string(credentialsId: 'RELEASE_TRACKER_TOKEN', variable: 'SECRET_TOKEN')]) {
-                                releaseToken = env.SECRET_TOKEN
-                            }
-                        } catch (Exception e2) {
-                            releaseToken = env.RELEASE_TRACKER_TOKEN ?: ""
+                    def commitMsg = env.GIT_COMMIT_MSG ?: ""
+                    if (commitMsg.contains("\n")) {
+                        commitMsg = commitMsg.split("\n")[0].trim()
+                    }
+                    if (commitMsg.contains("\r")) {
+                        commitMsg = commitMsg.split("\r")[0].trim()
+                    }
+
+                    def metadata = [
+                        version: APP_VERSION,
+                        gitCommit: env.GIT_COMMIT_HASH,
+                        gitCommitShort: env.GIT_COMMIT_SHORT,
+                        gitBranch: env.GIT_BRANCH_NAME,
+                        commitMessage: commitMsg,
+                        jenkinsBuildNumber: env.BUILD_NUMBER,
+                        jenkinsBuildUrl: env.BUILD_URL ?: ("http://localhost:8080/job/" + env.JOB_NAME + "/" + env.BUILD_NUMBER + "/"),
+                        testResult: "PASSED (31/31 tests)",
+                        deploymentStatus: "VERIFIED",
+                        environment: TARGET_ENV_NAME,
+                        dockerImageTag: VERSIONED_IMAGE_TAG,
+                        pipelineJob: env.JOB_NAME,
+                        deploymentId: "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+                    ]
+                    writeFile file: 'target/release-metadata.json', text: groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(metadata))
+
+                    def recordAction = {
+                        if (isUnix()) {
+                            sh '''
+                                headers=()
+                                headers+=(-H "Content-Type: application/json")
+                                if [ -n "$RELEASE_TRACKER_TOKEN" ]; then
+                                    headers+=(-H "X-Release-Token: $RELEASE_TRACKER_TOKEN")
+                                fi
+                                http_code=$(curl -s -o target/release-response.json -w "%{http_code}" -X POST "http://localhost:${TARGET_PORT}/api/version-history" "${headers[@]}" -d @target/release-metadata.json)
+                                if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+                                    echo "Release successfully recorded (HTTP $http_code)"
+                                else
+                                    echo "ERROR: Version history recording failed (HTTP $http_code): $(cat target/release-response.json 2>/dev/null)"
+                                    exit 1
+                                fi
+                            '''
+                        } else {
+                            powershell '''
+                                $headers = @{ 'Content-Type' = 'application/json' }
+                                if ($env:RELEASE_TRACKER_TOKEN) {
+                                    $headers['X-Release-Token'] = $env:RELEASE_TRACKER_TOKEN
+                                }
+                                try {
+                                    $res = Invoke-RestMethod -Uri "http://localhost:${env:TARGET_PORT}/api/version-history" -Method Post -Headers $headers -InFile 'target/release-metadata.json'
+                                    Write-Host "Release successfully recorded: $($res.message)"
+                                } catch {
+                                    $statusCode = "Unknown"
+                                    $errorBody = ""
+                                    if ($_.Exception.Response) {
+                                        $statusCode = [int]$_.Exception.Response.StatusCode
+                                        try {
+                                            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                                            $errorBody = $reader.ReadToEnd()
+                                        } catch {}
+                                    }
+                                    Write-Error "Version history recording failed (HTTP $statusCode): $errorBody - $($_.Exception.Message)"
+                                    exit 1
+                                }
+                            '''
                         }
                     }
 
-                    // Create metadata JSON file for provenance archiving
-                    def metadataPayload = """{
-  "version": "${APP_VERSION}",
-  "gitCommit": "${env.GIT_COMMIT_HASH}",
-  "gitCommitShort": "${env.GIT_COMMIT_SHORT}",
-  "gitBranch": "${env.GIT_BRANCH_NAME}",
-  "commitMessage": "${env.GIT_COMMIT_MSG.replace('"', '\\"')}",
-  "jenkinsBuildNumber": "${env.BUILD_NUMBER}",
-  "jenkinsBuildUrl": "${env.BUILD_URL ?: 'http://localhost:8080/job/' + env.JOB_NAME + '/' + env.BUILD_NUMBER + '/'}",
-  "testResult": "PASSED (31/31 tests)",
-  "deploymentStatus": "VERIFIED",
-  "environment": "${TARGET_ENV_NAME}",
-  "dockerImageTag": "${VERSIONED_IMAGE_TAG}",
-  "pipelineJob": "${env.JOB_NAME}",
-  "deploymentId": "${env.JOB_NAME}-${env.BUILD_NUMBER}"
-}"""
-                    writeFile file: 'target/release-metadata.json', text: metadataPayload
-
-                    // Post to Version History REST API
-                    if (isUnix()) {
-                        sh """
-                            curl -X POST http://localhost:${TARGET_PORT}/api/version-history \
-                                -H "Content-Type: application/json" \
-                                -H "X-Release-Token: ${releaseToken}" \
-                                -d @target/release-metadata.json
-                        """
-                    } else {
-                        bat """
-                            powershell -NoProfile -ExecutionPolicy Bypass -Command "\$headers = @{ 'Content-Type' = 'application/json' }; if ('${releaseToken}') { \$headers['X-Release-Token'] = '${releaseToken}' }; try { \$res = Invoke-RestMethod -Uri 'http://localhost:${TARGET_PORT}/api/version-history' -Method Post -Headers \$headers -InFile 'target/release-metadata.json'; Write-Host 'Release successfully recorded:' (\$res | ConvertTo-Json -Compress) } catch { Write-Warning 'Version history recording returned notice: '\$_.Exception.Message }"
-                        """
+                    try {
+                        withCredentials([string(credentialsId: 'queueless-release-token', variable: 'RELEASE_TRACKER_TOKEN')]) {
+                            recordAction()
+                        }
+                    } catch (Exception e) {
+                        try {
+                            withCredentials([string(credentialsId: 'RELEASE_TRACKER_TOKEN', variable: 'RELEASE_TRACKER_TOKEN')]) {
+                                recordAction()
+                            }
+                        } catch (Exception e2) {
+                            recordAction()
+                        }
                     }
                 }
             }

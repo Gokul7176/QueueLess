@@ -23,7 +23,7 @@ public class ReleaseRecordRequest {
     @Size(max = 64, message = "Git branch length cannot exceed 64 characters")
     private String gitBranch;
 
-    @Size(max = 500, message = "Commit message length cannot exceed 500 characters")
+    @Size(max = 2000, message = "Commit message length cannot exceed 2000 characters")
     private String commitMessage;
 
     @Size(max = 32, message = "Jenkins build number cannot exceed 32 characters")

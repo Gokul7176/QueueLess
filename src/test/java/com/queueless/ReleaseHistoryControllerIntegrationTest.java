@@ -259,4 +259,53 @@ class ReleaseHistoryControllerIntegrationTest {
         // Ensure database only contains 1 record with this deployment ID
         assertEquals(1, releaseRepository.count());
     }
+
+    @Test
+    @DisplayName("Integration Test 9: POST /api/version-history with malformed JSON returns 400 Bad Request instead of 500")
+    void testRecordRelease_MalformedJson_Returns400BadRequest() throws Exception {
+        String malformedJsonWithUnescapedNewline = "{\n" +
+                "  \"version\": \"1.1.0\",\n" +
+                "  \"gitCommit\": \"84b4a48\",\n" +
+                "  \"commitMessage\": \"commit 84b4a48\nAuthor: Student <student@college.edu>\n\nfix: broken build\"\n" +
+                "}";
+
+        mockMvc.perform(post("/api/version-history")
+                        .header("X-Release-Token", AUTH_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(malformedJsonWithUnescapedNewline))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.error", is("Malformed JSON Request")));
+    }
+
+    @Test
+    @DisplayName("Integration Test 10: POST /api/version-history with valid multiline commit message records successfully")
+    void testRecordRelease_MultilineCommitMessage_Success() throws Exception {
+        ReleaseRecordRequest request = new ReleaseRecordRequest(
+                "1.1.0",
+                "84b4a48a31110f28448f2d66c4a228609d81c52b",
+                "84b4a48",
+                "main",
+                "fix(docker): specify executable jar filename\n\nDetailed rationale:\n- Avoid wildcard collision",
+                "40",
+                "http://localhost:8080/job/QueueLess-CICD/40/",
+                "PASSED (31/31 tests)",
+                "VERIFIED",
+                "production",
+                "queueless:1.1.0-84b4a48",
+                "QueueLess-CICD",
+                "QueueLess-CICD-40"
+        );
+
+        mockMvc.perform(post("/api/version-history")
+                        .header("X-Release-Token", AUTH_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.deploymentId", is("QueueLess-CICD-40")))
+                .andExpect(jsonPath("$.data.commitMessage", containsString("fix(docker): specify executable jar filename")));
+
+        assertEquals(1, releaseRepository.count());
+    }
 }
