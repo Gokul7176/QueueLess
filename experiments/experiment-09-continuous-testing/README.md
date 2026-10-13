@@ -1,7 +1,7 @@
 # Experiment 9: Continuous Testing
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -144,16 +144,16 @@ To demonstrate that automated test failures halt the pipeline and prevent broken
 
 ## 7. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   All 17 tests execute in under 10 seconds. Surefire generates XML reports. When all tests pass, the build succeeds and deployment proceeds. When any test fails, Surefire exits with code 1, and the CI/CD pipeline immediately halts.
 
-- **Observed Result (Actual Laboratory Execution):**  
+- **Observed Result (Actual Laboratory Execution):**
   ```
   [INFO] Running com.queueless.QueueControllerIntegrationTest
   [INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.420 s
   [INFO] Running com.queueless.QueueServiceTest
   [INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.446 s
-  [INFO] 
+  [INFO]
   [INFO] Results:
   [INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
   [INFO] BUILD SUCCESS
@@ -182,31 +182,55 @@ To demonstrate that automated test failures halt the pipeline and prevent broken
 
 ---
 
-## 10. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 10. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-A comprehensive automated test suite consisting of 17 JUnit 5 unit and integration tests was implemented, executed via Maven, and integrated into the Jenkins CI/CD pipeline. Test reporting, pass/fail trends, and deployment gating via automated quality gates were successfully verified.
+Experiment 9 enforces the quality gate that safeguards every release recorded in the Version History Monitoring module:
+- **Comprehensive 31-Test Quality Gate:**
+  - 9 Unit tests (`QueueServiceTest`) verifying FIFO queue algorithms and state transitions.
+  - 8 Integration tests (`QueueControllerIntegrationTest`) verifying REST endpoints and request validation.
+  - 6 Unit tests (`ReleaseHistoryServiceTest`) verifying release recording, idempotency, and status filtering.
+  - 8 Integration tests (`ReleaseHistoryControllerIntegrationTest`) verifying token authentication (`X-Release-Token`), payload validation, and idempotency.
+- **Automated Pipeline Halting:** If even 1 test fails out of 31, Maven halts with exit code 1. The Jenkins CI/CD pipeline immediately aborts at Stage 3. No container is built, no deployment is performed, and the broken commit is NEVER recorded as a deployed release.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: Run the complete test suite locally
+  .\mvnw.cmd test
+
+  # Step 2: Verify that all 31 tests pass with zero failures
+  # Step 3: Open the Version History dashboard and view the Test Result badge:
+  # "PASSED (31/31 tests)"
+  # http://localhost:8085/#version-view
+  ```
 
 ---
 
-## 11. Viva Questions and Answers
+## 11. Student Experiment Result Record
 
-1. **What is the difference between a Unit Test and an Integration Test?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+A comprehensive automated test suite consisting of 31 JUnit 5 unit and integration tests (17 queue management tests + 14 version history & idempotency tests) was implemented, executed via Maven Wrapper, and integrated into the Jenkins CI/CD quality gate, verifying that only fully tested releases are deployed and recorded in the Version History monitoring module.
+
+---
+
+## 12. Viva Questions and Answers
+
+1. **What is the difference between a Unit Test and an Integration Test?**
    *Answer:* A unit test tests a single class or method in complete isolation, replacing all external dependencies (databases, networks, services) with mocks or stubs. An integration test verifies that multiple software modules (e.g., controllers, services, repositories, and the database) cooperate and communicate correctly within the Spring application context.
 
-2. **What does the `@AutoConfigureMockMvc` annotation do in Spring Boot testing?**  
+2. **What does the `@AutoConfigureMockMvc` annotation do in Spring Boot testing?**
    *Answer:* It configures and provides a `MockMvc` instance that simulates HTTP requests and responses against Spring controllers without starting a real HTTP network server, enabling fast, end-to-end REST endpoint testing.
 
-3. **What is Mockito used for in `QueueServiceTest`?**  
+3. **What is Mockito used for in `QueueServiceTest`?**
    *Answer:* Mockito mocks the `QueueTicketRepository` interface. It allows developers to specify predefined return values (`when(...).thenReturn(...)`) and verify method invocations (`verify(...)`), isolating the business logic in `QueueServiceImpl` from actual database read/write operations.
 
-4. **What is an "Automated Quality Gate" in a CI/CD pipeline?**  
+4. **What is an "Automated Quality Gate" in a CI/CD pipeline?**
    *Answer:* A quality gate is an automated check (such as unit test execution, code coverage threshold, or security vulnerability scan) embedded in the pipeline. If the software fails to meet the predefined criteria, the pipeline halts immediately, preventing defective code from reaching downstream deployment environments.
 
-5. **Where does Maven store JUnit XML reports, and why is this format important?**  
+5. **Where does Maven store JUnit XML reports, and why is this format important?**
    *Answer:* Maven stores XML reports in `target/surefire-reports/`. The XML format conforms to the standardized JUnit XML schema, allowing CI/CD servers (Jenkins, GitLab CI, GitHub Actions) to parse the results, calculate pass/fail ratios, display historical trends, and flag regressions.

@@ -1,6 +1,11 @@
 # Compiled class file
 *.class
 
+# Persistent H2 database storage
+data/
+*.mv.db
+*.trace.db
+
 # Log file
 *.log
 

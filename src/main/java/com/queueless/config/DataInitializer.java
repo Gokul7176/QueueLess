@@ -13,8 +13,10 @@ import java.time.LocalDateTime;
 public class DataInitializer {
 
     @Bean
-    public CommandLineRunner initDatabase(QueueTicketRepository repository) {
+    public CommandLineRunner initDatabase(QueueTicketRepository repository,
+                                          com.queueless.repository.ReleaseHistoryRepository releaseRepository) {
         return args -> {
+            // Seed baseline queue tickets
             if (repository.count() == 0) {
                 // Seed sample completed ticket
                 QueueTicket t1 = new QueueTicket("QL-0001", "Diana Prince", "Account Services");
@@ -43,6 +45,28 @@ public class DataInitializer {
                 t4.setStatus(TicketStatus.WAITING);
                 t4.setCreatedAt(LocalDateTime.now().minusMinutes(6));
                 repository.save(t4);
+            }
+
+            // Seed initial recorded release history using actual Git commit metadata
+            if (releaseRepository.count() == 0) {
+                com.queueless.model.ReleaseHistory baseline = new com.queueless.model.ReleaseHistory(
+                        "1.1.0",
+                        "c038603f4a6de3b89e05920791c4b95f745f434e",
+                        "c038603",
+                        "main",
+                        "feat: release v1.1.0 with CI/CD status badge and automated deployment footer",
+                        "1",
+                        "http://localhost:8080/job/QueueLess-CICD/1/",
+                        "PASSED (17/17 tests)",
+                        "VERIFIED",
+                        "production",
+                        "queueless:1.1.0-c038603",
+                        "QueueLess-CICD",
+                        "QueueLess-CICD-1"
+                );
+                baseline.setCurrent(true);
+                baseline.setDeployedAt(LocalDateTime.now().minusHours(2));
+                releaseRepository.save(baseline);
             }
         };
     }

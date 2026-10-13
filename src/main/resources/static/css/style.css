@@ -1024,3 +1024,199 @@ body {
     .dispatch-card { flex-direction: column; align-items: stretch; }
     .dispatch-group { flex-direction: column; align-items: stretch; }
 }
+
+/* ==============================================================================
+   VERSION HISTORY & CI/CD MONITOR STYLING
+   ============================================================================== */
+.version-kpi-grid {
+    margin-bottom: 1.5rem;
+}
+
+.sub-kpi-tag {
+    display: inline-block;
+    margin-top: 0.35rem;
+    font-size: 0.725rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sub-kpi-text {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    max-width: 220px;
+}
+
+.truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.full-width-field {
+    flex: 1;
+    min-width: 260px;
+}
+
+.font-mono {
+    font-family: var(--font-mono) !important;
+}
+
+.commit-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.commit-hash-pill {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #60a5fa;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+}
+
+.branch-pill {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #cbd5e1;
+    background: rgba(148, 163, 184, 0.15);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+}
+
+.version-tag-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.badge-version {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--text-main);
+}
+
+.badge-current {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+    animation: pulseCurrent 2s infinite;
+}
+
+@keyframes pulseCurrent {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; box-shadow: 0 0 8px rgba(16, 185, 129, 0.35); }
+    100% { opacity: 0.8; }
+}
+
+.status-badge-verified {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-badge-deployed {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-badge-failed {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(244, 63, 94, 0.15);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.test-badge-passed {
+    display: inline-block;
+    background: rgba(16, 185, 129, 0.1);
+    color: #4ade80;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.test-badge-failed {
+    display: inline-block;
+    background: rgba(244, 63, 94, 0.1);
+    color: #f87171;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+.jenkins-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.825rem;
+    transition: color 0.15s ease;
+}
+
+.jenkins-link:hover {
+    color: #7dd3fc;
+    text-decoration: underline;
+}
+
+.docker-tag-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.docker-tag-pill {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: inline-block;
+    max-width: 200px;
+}

@@ -87,4 +87,40 @@
 
 ### Issue: Tests fail due to pre-existing data in H2
 - **Symptom:** Ticket counter starts at an unexpected sequence number.
-- **Solution:** `QueueControllerIntegrationTest` includes `@BeforeEach void cleanUpDatabase() { ticketRepository.deleteAll(); }` to guarantee complete database isolation before each test method runs.
+- **Solution:** `QueueControllerIntegrationTest` and `ReleaseHistoryControllerIntegrationTest` include `@BeforeEach` cleanup methods to guarantee complete database isolation before each test method runs.
+
+---
+
+## 5. Version History & Release Monitoring Issues
+
+### Issue: POST `/api/version-history` returns 401 Unauthorized
+- **Symptom:** Jenkins pipeline Stage 8 prints `401 Unauthorized: Invalid or missing release authentication token`.
+- **Cause:** `RELEASE_TRACKER_TOKEN` is configured on the Spring Boot server, but the Jenkins job does not provide the matching `X-Release-Token` header.
+- **Solution:**
+  1. Add a **Secret text** credential in Jenkins with ID `RELEASE_TRACKER_TOKEN`.
+  2. Set the same secret token on the container via `-e RELEASE_TRACKER_TOKEN="<token>"`.
+  3. When testing locally without tokens, leave `RELEASE_TRACKER_TOKEN` unset to allow open local requests.
+
+### Issue: Version history records lost after Docker container deletion
+- **Symptom:** Container recreation deletes previous release records.
+- **Cause:** Container was started without mounting the persistent storage volume.
+- **Solution:** Always run the container with the named volume `-v queueless-data:/app/data`:
+  ```powershell
+  docker run -d -p 8085:8085 -v queueless-data:/app/data --name queueless-app queueless:latest
+  ```
+
+### Issue: Rollback to an older release required
+- **Symptom:** Newly deployed release has an issue and must be rolled back immediately.
+- **Solution:**
+  1. Check previous image tags: `docker images queueless`.
+  2. Stop and remove the current container:
+     ```powershell
+     docker stop queueless-app
+     docker rm queueless-app
+     ```
+  3. Start the previous known-good image with the persistent volume:
+     ```powershell
+     docker run -d -p 8085:8085 -v queueless-data:/app/data --name queueless-app --restart unless-stopped queueless:1.0.0
+     ```
+  4. Verify health: `curl -f http://localhost:8085/api/tickets/stats`.
+  5. Check `http://localhost:8085/#version-view` to confirm active release.

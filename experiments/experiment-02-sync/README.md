@@ -1,7 +1,7 @@
 # Experiment 2: Fetch and Synchronize Git Repositories
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -108,10 +108,10 @@ git status
 
 ## 7. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   `git fetch origin` updates the tracking ref `origin/main` without modifying local files. `git diff HEAD..origin/main` shows incoming changes. `git pull` successfully fast-forwards the branch with zero conflicts.
 
-- **Observed Result:**  
+- **Observed Result:**
   ```
   Fetching origin
   Updating 0ad2b04..e14f82a
@@ -143,31 +143,54 @@ git status
 
 ---
 
-## 10. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 10. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-Repository cloning, remote tracking configuration, non-destructive fetching, diff analysis, and bi-directional repository synchronization were successfully demonstrated and validated.
+Experiment 2 guarantees synchronization between developer workstations, central GitHub repositories, and CI/CD automation runners:
+- **Distributed Synchronization:** When engineers push commits to GitHub, the remote repository becomes the single source of truth for release candidates.
+- **CI/CD Pipeline Triggers:** Jenkins checkout stages (`checkout scm`) fetch and pull these exact remote refs. The QueueLess pipeline captures the fetched `GIT_COMMIT` and `GIT_BRANCH` metadata during build execution.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: Fetch and verify current remote tracking branch status
+  git fetch origin
+  git status -uno
+
+  # Step 2: Compare local HEAD commit with the remote origin commit
+  git rev-parse HEAD
+  git rev-parse origin/main
+
+  # Step 3: Check QueueLess Version History API to verify that the deployed version matches origin/main
+  curl -s http://localhost:8085/api/version-history/current
+  ```
 
 ---
 
-## 11. Viva Questions and Answers
+## 11. Student Experiment Result Record
 
-1. **What is the exact functional equation describing `git pull`?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+Repository cloning, remote tracking configuration, non-destructive fetching, diff analysis, and bi-directional repository synchronization were successfully demonstrated and validated, ensuring consistent source-code tracking across local environments, remote GitHub repositories, and automated CI/CD release pipelines.
+
+---
+
+## 12. Viva Questions and Answers
+
+1. **What is the exact functional equation describing `git pull`?**
    *Answer:* `git pull = git fetch + git merge` (or `git pull --rebase = git fetch + git rebase`). It retrieves the latest commits from the remote repository and immediately integrates them into the current active branch.
 
-2. **Why is it recommended in enterprise DevOps pipelines to run `git fetch` before merging?**  
+2. **Why is it recommended in enterprise DevOps pipelines to run `git fetch` before merging?**
    *Answer:* `git fetch` downloads metadata and objects without touching working trees or index states. This allows automated scripts or engineers to inspect incoming commits (`git log HEAD..origin/main`), run static analysis or diff checks, and verify integrity before merging.
 
-3. **What is a "Remote Tracking Branch"? Give an example.**  
+3. **What is a "Remote Tracking Branch"? Give an example.**
    *Answer:* A remote tracking branch is a read-only local reference that mirrors the state of a branch on the remote server at the time of the last `git fetch` or `git pull`. Example: `refs/remotes/origin/main` (displayed as `origin/main`).
 
-4. **What does a Fast-Forward merge mean?**  
+4. **What does a Fast-Forward merge mean?**
    *Answer:* A fast-forward merge occurs when the target branch has no divergent commits of its own since the branch point. Git simply moves the current branch pointer forward to point to the incoming commit without creating an extra merge commit.
 
-5. **How does `git remote add` differ from `git clone`?**  
+5. **How does `git remote add` differ from `git clone`?**
    *Answer:* `git clone` downloads an entire repository, initializes a new working directory and `.git` database, and automatically configures `origin`. `git remote add` simply registers a new remote URL and nickname inside an already existing local Git repository.

@@ -1,10 +1,10 @@
 # Experiment 4: Jenkins Build Job Integrated with Git
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
-**Job Name:** `QueueLess-Build`  
-**Target Repository:** `https://github.com/Gokul7176/QueueLess.git`  
-**Branch:** `main`  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
+**Job Name:** `QueueLess-Build`
+**Target Repository:** `https://github.com/Gokul7176/QueueLess.git`
+**Branch:** `main`
 
 ---
 
@@ -120,10 +120,10 @@ Commit message: "ci: enhance Jenkinsfile and auto-detect JAVA_HOME in mvnw.cmd f
 [INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0
 [INFO] Running com.queueless.QueueServiceTest
 [INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
-[INFO] 
+[INFO]
 [INFO] Results:
 [INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
-[INFO] 
+[INFO]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
@@ -149,7 +149,7 @@ To demonstrate that `QueueLess-Build` properly reports failures when bugs or syn
 3. Trigger **Build Now** in Jenkins.
 4. Verify that Jenkins outputs:
    ```text
-   [ERROR] Failures: 
+   [ERROR] Failures:
    [ERROR]   QueueServiceTest.testJoinQueue_Success:54 expected: <COMPLETED> but was: <WAITING>
    [INFO] BUILD FAILURE
    Build step 'Execute Windows batch command' marked build as failure
@@ -183,31 +183,52 @@ Capture the following screenshots from your Jenkins interface for your lab recor
 
 ---
 
-## 9. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 9. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-A Jenkins Freestyle job named `QueueLess-Build` was successfully created and connected to GitHub repository `https://github.com/Gokul7176/QueueLess.git`. Automated source checkout, compilation, test execution using `mvnw.cmd`, and JUnit test report publication were verified with zero failures.
+Experiment 4 establishes the Continuous Integration (CI) foundation for the Version History module:
+- **Build Number Attribution:** Every Jenkins build run increments the official sequential build number (e.g., `#1`, `#2`). QueueLess Version History records this exact `jenkinsBuildNumber` and provides clickable links to the Jenkins run (`jenkinsBuildUrl`).
+- **Automated Test Quality Gate:** Jenkins collects test metrics from `target/surefire-reports/*.xml`. If any of the 31 automated tests fail, the build fails immediately. Broken code is NEVER recorded as a deployed release.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: Open the Jenkins build history
+  # Navigate to: http://localhost:8080/job/QueueLess-Build/
+
+  # Step 2: Note the latest successful build number (e.g., #1)
+
+  # Step 3: Open QueueLess Version History Dashboard:
+  # http://localhost:8085/#version-view
+  # Observe the Jenkins Build # and Test Quality Gate badges reflecting CI execution!
+  ```
 
 ---
 
-## 10. Viva Questions and Answers
+## 10. Student Experiment Result Record
 
-1. **What is the difference between a Jenkins Freestyle Project and a Jenkins Pipeline Project?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+A Jenkins Freestyle job named `QueueLess-Build` was successfully created and connected to GitHub repository `https://github.com/Gokul7176/QueueLess.git`. Automated source checkout, compilation, test execution using `mvnw.cmd`, and JUnit test report publication were verified with zero failures, establishing CI build provenance for the QueueLess release tracking system.
+
+---
+
+## 11. Viva Questions and Answers
+
+1. **What is the difference between a Jenkins Freestyle Project and a Jenkins Pipeline Project?**
    *Answer:* A Freestyle project is configured manually through the Jenkins GUI web forms and stores its configuration as an XML file on the Jenkins server. A Pipeline project is defined as code in a version-controlled `Jenkinsfile` (Pipeline-as-Code), allowing multi-stage workflows, parallel execution, and automated deployment pipelines tracked in Git.
 
-2. **Why do we use `call mvnw.cmd` instead of just `mvnw.cmd` in a Windows batch build step?**  
+2. **Why do we use `call mvnw.cmd` instead of just `mvnw.cmd` in a Windows batch build step?**
    *Answer:* In Windows Command Prompt (`cmd.exe`), executing another `.cmd` or `.bat` script without the `call` keyword causes the parent batch process to transfer execution permanently to the target script and terminate immediately upon completion, skipping all subsequent Jenkins steps. `call` ensures execution returns to Jenkins.
 
-3. **What is the function of the Maven Surefire plugin and where does it output test reports?**  
+3. **What is the function of the Maven Surefire plugin and where does it output test reports?**
    *Answer:* The `maven-surefire-plugin` executes JUnit test classes during the `test` phase. It outputs machine-readable XML test reports to `target/surefire-reports/*.xml`, containing execution duration, passed tests, and failure stack traces.
 
-4. **How does Jenkins know whether a build has Succeeded or Failed?**  
+4. **How does Jenkins know whether a build has Succeeded or Failed?**
    *Answer:* Jenkins monitors the exit code returned by the executed process. An exit code of `0` indicates success. Any non-zero exit code (such as exit code `1` returned by Maven when compilation or unit tests fail) marks the build as `FAILURE`.
 
-5. **Why is the Maven Wrapper (`mvnw.cmd`) preferred over installing global Maven on the Jenkins server?**  
+5. **Why is the Maven Wrapper (`mvnw.cmd`) preferred over installing global Maven on the Jenkins server?**
    *Answer:* The Maven Wrapper bundles the exact Maven version required by the application within the project repository. It eliminates tool version discrepancies between developer laptops, CI build servers, and Docker containers, ensuring fully reproducible builds without requiring administrative tool configuration on Jenkins.

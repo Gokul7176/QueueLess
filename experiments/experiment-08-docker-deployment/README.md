@@ -1,7 +1,7 @@
 # Experiment 8: Deploying and Managing the Java/Web Application Using Docker
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -137,10 +137,10 @@ docker volume inspect queueless_data
 
 ## 6. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   Container `queueless-app` runs in detached mode on port 8085. Browser access works seamlessly. REST API responds with JSON envelopes. Container logs output Spring Boot startup. Stop and start retain container state.
 
-- **Observed Result (Actual Laboratory Execution):**  
+- **Observed Result (Actual Laboratory Execution):**
   ```
   CONTAINER ID   IMAGE              STATUS                    PORTS                    NAMES
   c61ce19ecf9d   queueless:latest   Up 20 seconds (healthy)   0.0.0.0:8085->8085/tcp   queueless-app
@@ -172,31 +172,59 @@ docker volume inspect queueless_data
 
 ---
 
-## 9. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 9. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-The QueueLess Java web application was successfully deployed inside an isolated Docker container with port mapping on host port 8085. Web UI features, REST API endpoints, container lifecycle operations, log streaming, and persistence mechanics were thoroughly verified.
+Experiment 8 governs containerized deployment execution, persistent storage volumes, and controlled release rollback:
+- **Persistent Release History Retention:** By mounting the Docker volume `-v queueless-data:/app/data`, the embedded H2 file database (`/app/data/queuelessdb.mv.db`) persists across container upgrades, restarts, and re-deployments. Version history records are never lost when containers are updated.
+- **Controlled Rollback Procedure:**
+  When a newly deployed release exhibits unexpected runtime issues, DevOps engineers execute a rapid, controlled rollback to the previous verified Docker image:
+  ```powershell
+  # Step 1: List all available local QueueLess release images
+  docker images queueless
+
+  # Step 2: Stop and remove the current malfunctioning container
+  docker stop queueless-app
+  docker rm queueless-app
+
+  # Step 3: Run the previous verified release with persistent volume
+  docker run -d -p 8085:8085 -v queueless-data:/app/data --name queueless-app --restart unless-stopped queueless:1.0.0
+
+  # Step 4: Verify application health
+  curl -f http://localhost:8085/api/tickets/stats
+
+  # Step 5: Verify that the Version History dashboard reports the rollback state
+  # http://localhost:8085/#version-view
+  ```
 
 ---
 
-## 10. Viva Questions and Answers
+## 10. Student Experiment Result Record
 
-1. **What is the difference between Container Ephemeral Storage and Docker Volumes?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+The QueueLess Java web application was successfully deployed inside an isolated Docker container with port mapping on host port 8085, persistent volume attachment (`queueless-data:/app/data`), and verified release rollback mechanics connected to the Version History Monitoring module.
+
+---
+
+## 11. Viva Questions and Answers
+
+1. **What is the difference between Container Ephemeral Storage and Docker Volumes?**
    *Answer:* Container ephemeral storage exists in the container's top-level writable layer and is permanently destroyed when the container is removed (`docker rm`). Docker Volumes are managed storage directories stored directly on the host filesystem outside the container union filesystem, decoupled from container lifecycles and safely shared across multiple containers.
 
-2. **How does Docker handle port forwarding (`-p 8085:8085`) internally?**  
+2. **How does Docker handle port forwarding (`-p 8085:8085`) internally?**
    *Answer:* Docker uses a built-in proxy process (`docker-proxy`) and Linux `iptables` / Windows NAT forwarding rules to route network packets arriving at the host's network interface on port 8085 into the virtual network interface inside the container namespace.
 
-3. **What is the purpose of the `docker logs -f` command?**  
+3. **What is the purpose of the `docker logs -f` command?**
    *Answer:* The `-f` (follow) flag streams live log output from the container's `stdout` and `stderr` directly to the terminal in real time, similar to the Unix `tail -f` command, enabling continuous monitoring of application runtime events.
 
-4. **Why is it essential to run Spring Boot inside Docker with `SERVER_PORT` configured?**  
+4. **Why is it essential to run Spring Boot inside Docker with `SERVER_PORT` configured?**
    *Answer:* In microservice and containerized architectures, configuring the port via environment variables (`${SERVER_PORT:8085}`) allows orchestration systems (Kubernetes, Docker Compose, Ansible) to inject port assignments dynamically without requiring recompilation of source code.
 
-5. **What is the purpose of the `restart: unless-stopped` policy in container deployments?**  
+5. **What is the purpose of the `restart: unless-stopped` policy in container deployments?**
    *Answer:* The `unless-stopped` restart policy ensures that if the container crashes, or if the Docker daemon or host operating system reboots, Docker will automatically restart the application container, guaranteeing high availability unless an administrator explicitly stopped it.

@@ -1,7 +1,7 @@
 # Experiment 1: Git Installation and Local/Remote Repositories
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -103,10 +103,10 @@ git push -u origin main
 
 ## 7. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   `git --version` returns Git 2.x+. `git init` creates an empty repository on branch `main`. Staging and committing stores 34+ files. `git push` successfully uploads the repository to GitHub without errors.
 
-- **Observed Result (Actual Laboratory Execution):**  
+- **Observed Result (Actual Laboratory Execution):**
   ```
   git version 2.55.0.windows.2
   Initialized empty Git repository in C:/queuless/.git/
@@ -139,31 +139,50 @@ Capture the following screenshots and store them in `docs/screenshots/` (or your
 
 ---
 
-## 10. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 10. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-The Git version control environment was successfully installed and configured. The QueueLess virtual queue management codebase was initialized, staged, committed, and synchronized with the remote GitHub repository according to the laboratory syllabus specifications.
+In the QueueLess architecture, Experiment 1 provides the foundational cryptographic anchors for all release tracking:
+- **Source Code Provenance:** Every Git commit (`git commit -m ...`) generates a unique SHA-1 hash (e.g., `c038603`) that represents an immutable snapshot of the virtual queue application.
+- **Auditability in Version History:** The QueueLess Version History Monitoring module (`GET /api/version-history`) reads and displays this exact Git short commit hash, commit message, and author timestamp for every release deployed to production.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: Inspect the latest Git commit hash and message
+  git log -n 1 --oneline
+
+  # Step 2: Open QueueLess Version History Dashboard
+  # Navigate to: http://localhost:8085/#version-view
+  # Verify that the active release displays the exact matching Git commit short hash!
+  ```
 
 ---
 
-## 11. Viva Questions and Answers
+## 11. Student Experiment Result Record
 
-1. **What is the difference between a Centralized Version Control System (CVCS) and a Distributed Version Control System (DVCS)?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+The Git version control environment was successfully installed and configured. The QueueLess virtual queue management codebase was initialized, staged, committed, and synchronized with the remote GitHub repository according to the laboratory syllabus specifications, establishing the baseline Git provenance required for automated CI/CD version history monitoring.
+
+---
+
+## 12. Viva Questions and Answers
+
+1. **What is the difference between a Centralized Version Control System (CVCS) and a Distributed Version Control System (DVCS)?**
    *Answer:* In a CVCS (e.g., SVN), a single central server holds all versions of files, and clients check out single snapshots. If the server fails, history is inaccessible. In a DVCS (e.g., Git), every client clones the entire repository with full history, allowing offline operations, local branching, and distributed redundancy.
 
-2. **What does the Staging Area (Index) do in Git?**  
+2. **What does the Staging Area (Index) do in Git?**
    *Answer:* The staging area serves as an intermediate buffer between the working directory and the permanent commit log. It allows developers to selectively review, organize, and craft cohesive, atomic commits rather than committing all modified files indiscriminately.
 
-3. **What is the function of the `.gitignore` file?**  
+3. **What is the function of the `.gitignore` file?**
    *Answer:* `.gitignore` specifies untracked file patterns (e.g., compiled `.class` files, `target/` directories, IDE metadata, API keys, and OS temporary files) that Git should deliberately ignore, preventing repository bloat and credential exposure.
 
-4. **What does the command `git commit -m` do internally?**  
+4. **What does the command `git commit -m` do internally?**
    *Answer:* Git takes the snapshot of files currently in the staging area, creates blob objects for changed contents, builds a tree object representing the directory structure, writes a commit object containing author metadata, timestamp, commit message, and pointer to parent commit(s), and advances the current branch pointer.
 
-5. **How does HTTPS authentication differ from SSH authentication when communicating with GitHub?**  
+5. **How does HTTPS authentication differ from SSH authentication when communicating with GitHub?**
    *Answer:* HTTPS uses standard web ports (443) and authenticates using GitHub Personal Access Tokens (PAT). SSH uses asymmetric public/private key pairs (typically port 22 or 443) to authenticate cryptographically without requiring tokens or credentials to be entered per session.

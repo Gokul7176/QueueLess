@@ -39,6 +39,9 @@
                 <button class="tab-btn" id="tabDisplayBtn" data-tab="display-view" role="tab" aria-selected="false">
                     <span class="tab-icon">📺</span> Live Queue Board
                 </button>
+                <button class="tab-btn" id="tabVersionBtn" data-tab="version-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">📜</span> Version History
+                </button>
             </nav>
 
             <!-- Status Indicator & Clock -->
@@ -313,6 +316,115 @@
                 </div>
             </div>
         </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 4: VERSION HISTORY & RELEASE MONITOR -->
+        <!-- ============================================================= -->
+        <section id="version-view" class="view-panel" role="tabpanel">
+            <div class="view-header flex-between">
+                <div>
+                    <h2>CI/CD Version History & Release Monitor</h2>
+                    <p>Live release lifecycle tracking: verified Git commits, Jenkins build pipeline runs, quality gate tests, and Docker deployment provenance.</p>
+                </div>
+                <div class="admin-controls-top">
+                    <button class="btn btn-secondary btn-sm" id="btnRefreshVersions">
+                        <span>🔄 Refresh Releases</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Current Deployed Release Hero / KPI Cards -->
+            <div class="kpi-grid version-kpi-grid">
+                <div class="kpi-card indigo">
+                    <div class="kpi-icon">🚀</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value" id="currentVersionBadge">v1.1.0</span>
+                        <span class="kpi-label">Active Deployed Version</span>
+                        <span class="sub-kpi-tag" id="currentDockerTag">queueless:latest</span>
+                    </div>
+                </div>
+                <div class="kpi-card slate">
+                    <div class="kpi-icon">🌿</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value font-mono" id="currentCommitHash">c038603</span>
+                        <span class="kpi-label" id="currentBranchLabel">Branch: main</span>
+                        <span class="sub-kpi-text truncate" id="currentCommitMsg">feat: release v1.1.0</span>
+                    </div>
+                </div>
+                <div class="kpi-card emerald">
+                    <div class="kpi-icon">🛡️</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value" id="currentQualityGate">PASSED</span>
+                        <span class="kpi-label">Test Quality Gate</span>
+                        <span class="sub-kpi-tag" id="currentJenkinsBuild">Jenkins Build #1</span>
+                    </div>
+                </div>
+                <div class="kpi-card amber">
+                    <div class="kpi-icon">📦</div>
+                    <div class="kpi-details">
+                        <span class="kpi-value" id="totalReleasesCount">0</span>
+                        <span class="kpi-label">Total Recorded Releases</span>
+                        <span class="sub-kpi-tag" id="currentEnvBadge">Env: Production</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter & Search Toolbar -->
+            <div class="card dispatch-card">
+                <div class="dispatch-group">
+                    <div class="dispatch-field full-width-field">
+                        <label for="versionSearchInput">Search Releases:</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔍</span>
+                            <input type="text" id="versionSearchInput" class="form-control-sm" placeholder="Filter by version, commit hash, branch, or build...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Filter by Status:</label>
+                    <div class="pill-group" id="versionFilterPills">
+                        <button class="pill active" data-vfilter="ALL">All Releases</button>
+                        <button class="pill" data-vfilter="VERIFIED">Verified</button>
+                        <button class="pill" data-vfilter="DEPLOYED">Deployed</button>
+                        <button class="pill" data-vfilter="FAILED">Failed</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Version History Table Card -->
+            <div class="card table-card">
+                <div class="table-responsive">
+                    <table class="data-table" id="versionTable">
+                        <thead>
+                            <tr>
+                                <th>Version / Release</th>
+                                <th>Git Commit</th>
+                                <th>Branch</th>
+                                <th>Commit Message</th>
+                                <th>Jenkins Build</th>
+                                <th>Test Result</th>
+                                <th>Deployment Status</th>
+                                <th>Environment & Docker Tag</th>
+                                <th>Deployed At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="versionTableBody">
+                            <tr>
+                                <td colspan="9" class="text-center loading-cell">Loading release history...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State Placeholder -->
+                <div id="versionEmptyState" class="empty-state hidden">
+                    <div class="empty-icon">📜</div>
+                    <h4>No Release History Records Found</h4>
+                    <p id="versionEmptyStateMsg">No deployment records match the selected filter. Releases deployed through Jenkins CI/CD will automatically appear here.</p>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Footer with CI/CD Build Information -->
@@ -321,7 +433,7 @@
             <strong style="color: #e2e8f0;">QueueLess Virtual Queue System</strong> • Automated Deployment via Jenkins Declarative CI/CD Pipeline
         </div>
         <div style="display: flex; gap: 1rem; align-items: center;">
-            <span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
+            <span id="footerBuildBadge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
                 ● Build v1.1.0 Verified
             </span>
             <span style="color: #64748b;">Course: 23IT723 DevOps Lab</span>

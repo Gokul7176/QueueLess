@@ -14,7 +14,11 @@
         autoRefreshInterval: null,
         isAutoRefreshActive: true,
         currentFilter: 'ALL',
-        isOnline: true
+        isOnline: true,
+        versionFilter: 'ALL',
+        versionSearchQuery: '',
+        releases: [],
+        currentRelease: null
     };
 
     // DOM Elements
@@ -25,6 +29,7 @@
         serverStatusText: document.getElementById('serverStatusText'),
         toastContainer: document.getElementById('toastContainer'),
         systemAlert: document.getElementById('systemAlert'),
+        footerBuildBadge: document.getElementById('footerBuildBadge'),
 
         // Tab Navigation
         tabButtons: document.querySelectorAll('.tab-btn'),
@@ -66,7 +71,24 @@
 
         // Live Board View
         servingCountersContainer: document.getElementById('servingCountersContainer'),
-        upNextListContainer: document.getElementById('upNextListContainer')
+        upNextListContainer: document.getElementById('upNextListContainer'),
+
+        // Version History View
+        currentVersionBadge: document.getElementById('currentVersionBadge'),
+        currentDockerTag: document.getElementById('currentDockerTag'),
+        currentCommitHash: document.getElementById('currentCommitHash'),
+        currentBranchLabel: document.getElementById('currentBranchLabel'),
+        currentCommitMsg: document.getElementById('currentCommitMsg'),
+        currentQualityGate: document.getElementById('currentQualityGate'),
+        currentJenkinsBuild: document.getElementById('currentJenkinsBuild'),
+        totalReleasesCount: document.getElementById('totalReleasesCount'),
+        currentEnvBadge: document.getElementById('currentEnvBadge'),
+        versionSearchInput: document.getElementById('versionSearchInput'),
+        versionFilterPills: document.querySelectorAll('#versionFilterPills .pill'),
+        versionTableBody: document.getElementById('versionTableBody'),
+        versionEmptyState: document.getElementById('versionEmptyState'),
+        versionEmptyStateMsg: document.getElementById('versionEmptyStateMsg'),
+        btnRefreshVersions: document.getElementById('btnRefreshVersions')
     };
 
     // =========================================================================
@@ -85,6 +107,7 @@
 
         // Initial Data Load
         refreshDashboardData();
+        fetchCurrentVersionInfo();
     }
 
     // Live Clock Display
@@ -112,6 +135,9 @@
                 refreshDashboardData(true);
                 if (state.activeTicketNumber) {
                     fetchTicketStatus(state.activeTicketNumber, false);
+                }
+                if (state.activeTab === 'version-view') {
+                    loadVersionHistoryData(false);
                 }
             }, 5000);
         }
@@ -176,6 +202,31 @@
                 loadTicketsTable();
             });
         });
+
+        // Version History Filter & Search Events
+        if (elements.versionSearchInput) {
+            elements.versionSearchInput.addEventListener('input', (e) => {
+                state.versionSearchQuery = e.target.value.toLowerCase().trim();
+                renderVersionTable();
+            });
+        }
+
+        if (elements.versionFilterPills) {
+            elements.versionFilterPills.forEach(pill => {
+                pill.addEventListener('click', () => {
+                    elements.versionFilterPills.forEach(p => p.classList.remove('active'));
+                    pill.classList.add('active');
+                    state.versionFilter = pill.getAttribute('data-vfilter') || 'ALL';
+                    renderVersionTable();
+                });
+            });
+        }
+
+        if (elements.btnRefreshVersions) {
+            elements.btnRefreshVersions.addEventListener('click', () => {
+                loadVersionHistoryData(true);
+            });
+        }
     }
 
     function switchTab(viewId) {
@@ -193,6 +244,8 @@
         // Refresh view-specific content
         if (viewId === 'admin-view' || viewId === 'display-view') {
             refreshDashboardData(false);
+        } else if (viewId === 'version-view') {
+            loadVersionHistoryData(false);
         }
     }
 
@@ -665,6 +718,215 @@
             elements.serverStatusBadge.style.color = 'var(--danger)';
             elements.serverStatusBadge.style.border = '1px solid #fecaca';
             elements.serverStatusText.textContent = 'Server Offline';
+        }
+    }
+
+    // =========================================================================
+    // VERSION HISTORY & RELEASE MONITOR API & RENDERING
+    // =========================================================================
+
+    async function fetchCurrentVersionInfo() {
+        try {
+            const response = await fetch('/api/version-history/current');
+            const result = await response.json();
+            if (response.ok && result.success && result.data) {
+                const cur = result.data;
+                state.currentRelease = cur;
+
+                if (elements.currentVersionBadge) {
+                    elements.currentVersionBadge.textContent = 'v' + (cur.version || '1.1.0').replace(/^v/, '');
+                }
+                if (elements.currentDockerTag) {
+                    elements.currentDockerTag.textContent = cur.dockerImageTag || 'queueless:latest';
+                }
+                if (elements.currentCommitHash) {
+                    elements.currentCommitHash.textContent = cur.gitCommitShort || 'c038603';
+                }
+                if (elements.currentBranchLabel) {
+                    elements.currentBranchLabel.textContent = 'Branch: ' + (cur.gitBranch || 'main');
+                }
+                if (elements.currentCommitMsg) {
+                    elements.currentCommitMsg.textContent = cur.commitMessage || 'feat: release v1.1.0';
+                    elements.currentCommitMsg.title = cur.commitMessage || '';
+                }
+                if (elements.currentQualityGate) {
+                    const tp = (cur.testResult || '').toUpperCase();
+                    elements.currentQualityGate.textContent = tp.includes('PASSED') ? 'PASSED' : (cur.testResult || 'VERIFIED');
+                }
+                if (elements.currentJenkinsBuild) {
+                    elements.currentJenkinsBuild.textContent = cur.jenkinsBuildNumber ? ('Jenkins Build #' + cur.jenkinsBuildNumber) : 'Jenkins CI/CD';
+                }
+                if (elements.currentEnvBadge) {
+                    elements.currentEnvBadge.textContent = 'Env: ' + (cur.environment || 'Production');
+                }
+                if (elements.footerBuildBadge) {
+                    elements.footerBuildBadge.textContent = `● Build v${(cur.version || '1.1.0').replace(/^v/, '')} Verified`;
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching current version info:', error);
+        }
+    }
+
+    async function loadVersionHistoryData(notify = false) {
+        try {
+            await fetchCurrentVersionInfo();
+            const response = await fetch('/api/version-history');
+            const result = await response.json();
+
+            if (response.ok && result.success && Array.isArray(result.data)) {
+                state.releases = result.data;
+                if (elements.totalReleasesCount) {
+                    elements.totalReleasesCount.textContent = state.releases.length;
+                }
+                renderVersionTable();
+                if (notify) {
+                    showToast(`Release history updated (${state.releases.length} records)`, 'info');
+                }
+            } else {
+                if (elements.versionTableBody) {
+                    elements.versionTableBody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Unable to load release history records.</td></tr>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading version history:', error);
+            if (elements.versionTableBody) {
+                elements.versionTableBody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Failed to connect to version history API.</td></tr>';
+            }
+        }
+    }
+
+    function renderVersionTable() {
+        if (!elements.versionTableBody) return;
+
+        let filtered = state.releases || [];
+
+        // Apply Status Filter
+        if (state.versionFilter && state.versionFilter !== 'ALL') {
+            filtered = filtered.filter(r => {
+                const s = (r.deploymentStatus || '').toUpperCase();
+                return s === state.versionFilter.toUpperCase();
+            });
+        }
+
+        // Apply Search Query
+        if (state.versionSearchQuery) {
+            const q = state.versionSearchQuery;
+            filtered = filtered.filter(r =>
+                (r.version && r.version.toLowerCase().includes(q)) ||
+                (r.gitCommit && r.gitCommit.toLowerCase().includes(q)) ||
+                (r.gitCommitShort && r.gitCommitShort.toLowerCase().includes(q)) ||
+                (r.gitBranch && r.gitBranch.toLowerCase().includes(q)) ||
+                (r.commitMessage && r.commitMessage.toLowerCase().includes(q)) ||
+                (r.jenkinsBuildNumber && String(r.jenkinsBuildNumber).toLowerCase().includes(q)) ||
+                (r.environment && r.environment.toLowerCase().includes(q)) ||
+                (r.dockerImageTag && r.dockerImageTag.toLowerCase().includes(q))
+            );
+        }
+
+        if (filtered.length === 0) {
+            elements.versionTableBody.innerHTML = '';
+            if (elements.versionEmptyState) {
+                elements.versionEmptyState.classList.remove('hidden');
+                if (elements.versionEmptyStateMsg) {
+                    elements.versionEmptyStateMsg.textContent = state.releases.length === 0
+                        ? 'No release history records have been recorded yet. Releases deployed through Jenkins CI/CD pipeline will automatically appear here.'
+                        : 'No releases match your current search and filter criteria. Try clearing the filter or search query.';
+                }
+            }
+            return;
+        }
+
+        if (elements.versionEmptyState) {
+            elements.versionEmptyState.classList.add('hidden');
+        }
+
+        elements.versionTableBody.innerHTML = filtered.map(r => {
+            const isCurr = r.current === true;
+            const statusUpper = (r.deploymentStatus || 'DEPLOYED').toUpperCase();
+            let statusBadgeClass = 'status-badge-deployed';
+            let statusIcon = '🚀';
+
+            if (statusUpper === 'VERIFIED') {
+                statusBadgeClass = 'status-badge-verified';
+                statusIcon = '✅';
+            } else if (statusUpper === 'FAILED') {
+                statusBadgeClass = 'status-badge-failed';
+                statusIcon = '❌';
+            }
+
+            const testPassed = (r.testResult || '').toUpperCase().includes('PASSED');
+            const testBadgeClass = testPassed ? 'test-badge-passed' : 'test-badge-failed';
+
+            const jenkinsDisplay = r.jenkinsBuildUrl
+                ? `<a href="${escapeHtml(r.jenkinsBuildUrl)}" target="_blank" rel="noopener noreferrer" class="jenkins-link">
+                    🔗 #${escapeHtml(r.jenkinsBuildNumber || 'Job')}
+                   </a>`
+                : (r.jenkinsBuildNumber ? `#${escapeHtml(r.jenkinsBuildNumber)}` : 'Manual');
+
+            const formattedDate = r.deployedAt ? formatTimestamp(r.deployedAt) : 'Recently';
+
+            return `
+                <tr>
+                    <td>
+                        <div class="version-tag-wrapper">
+                            <span class="badge-version">v${escapeHtml(r.version || '1.0.0')}</span>
+                            ${isCurr ? '<span class="badge-current">CURRENT</span>' : ''}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="commit-cell">
+                            <span class="commit-hash-pill" title="Full commit: ${escapeHtml(r.gitCommit || '')}">
+                                ${escapeHtml(r.gitCommitShort || (r.gitCommit ? r.gitCommit.substring(0, 7) : ''))}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="branch-pill">🌿 ${escapeHtml(r.gitBranch || 'main')}</span>
+                    </td>
+                    <td style="max-width: 240px;" title="${escapeHtml(r.commitMessage || '')}">
+                        <div class="truncate" style="font-size: 0.825rem; color: var(--text-main);">
+                            ${escapeHtml(r.commitMessage || 'Automated deployment build')}
+                        </div>
+                    </td>
+                    <td>
+                        ${jenkinsDisplay}
+                    </td>
+                    <td>
+                        <span class="${testBadgeClass}">${escapeHtml(r.testResult || 'PASSED')}</span>
+                    </td>
+                    <td>
+                        <span class="${statusBadgeClass}">
+                            <span>${statusIcon}</span> ${escapeHtml(statusUpper)}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="docker-tag-cell">
+                            <span style="font-size: 0.75rem; color: #94a3b8;">${escapeHtml(r.environment || 'production')}</span>
+                            <span class="docker-tag-pill truncate" title="${escapeHtml(r.dockerImageTag || '')}">
+                                🐳 ${escapeHtml(r.dockerImageTag || 'queueless:latest')}
+                            </span>
+                        </div>
+                    </td>
+                    <td style="font-size: 0.775rem; color: var(--text-muted); white-space: nowrap;">
+                        ${formattedDate}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function formatTimestamp(isoString) {
+        if (!isoString) return '—';
+        try {
+            const date = new Date(isoString);
+            return date.toLocaleDateString([], {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            }) + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        } catch (e) {
+            return isoString;
         }
     }
 

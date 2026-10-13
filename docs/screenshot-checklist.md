@@ -1,7 +1,7 @@
 # Comprehensive Laboratory Screenshot Checklist
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 This master checklist details all required visual evidence items to include in your printed or digital college DevOps Laboratory Record.
 
@@ -56,6 +56,9 @@ This master checklist details all required visual evidence items to include in y
 | **09** | Continuous Testing | `exp09_03_jenkins_test_trend.png` | Jenkins Test Result page showing test breakdown and duration chart. | [x] |
 | **09** | Continuous Testing | `exp09_04_jenkins_failed_test_pipeline.png` | Jenkins Stage View showing Stage 3 red failure and Deploy stage skipped. | [x] |
 | **09** | Continuous Testing | `exp09_05_jenkins_test_failure_details.png` | Jenkins Test Failure diagnosis showing assertion error and stack trace. | [x] |
+| **05** | CI/CD Pipeline in Jenkins | `exp05_06_version_history_recording.png` | Pipeline console log showing Stage 8 deployment recorded via POST /api/version-history and artifact archiving. | [x] |
+| **08** | Deploying & Managing App in Docker | `exp08_06_docker_volume_persistence.png` | Terminal showing `docker volume inspect queueless-data` ensuring database persistence across container restarts. | [x] |
+| **09** | Continuous Testing | `exp09_06_version_history_test_suite.png` | Terminal showing `mvn test` executing all 31 unit and integration tests (including ReleaseHistory) with 0 failures. | [x] |
 | **10** | Software Configuration Mgmt (Ansible) | `exp10_01_ansible_version.png` | Ubuntu WSL2 terminal showing `ansible --version`. | [x] |
 | **10** | Software Configuration Mgmt (Ansible) | `exp10_02_ansible_ping.png` | Terminal showing `ansible -i inventory.ini all -m ping` returning pong. | [x] |
 | **10** | Software Configuration Mgmt (Ansible) | `exp10_03_syntax_check.png` | Terminal showing `ansible-playbook deploy.yml --syntax-check` success. | [x] |
@@ -66,3 +69,5 @@ This master checklist details all required visual evidence items to include in y
 | **UI** | Application User Interface | `admin_console_1791820406033.png` | Admin console displaying KPI metric cards and tickets data table. | [x] |
 | **UI** | Application User Interface | `admin_console_called_1791820420882.png` | Admin console toast notification when next waiting customer is called. | [x] |
 | **UI** | Application User Interface | `live_queue_board_1791820438046.png` | Live Public Display Board showing "Now Serving" counters and "Up Next". | [x] |
+| **UI** | Version History Dashboard | `version_history_dashboard.png` | Version History UI dashboard displaying active release card, commit hash pill, branch, Jenkins build number, deployment status, and releases table. | [x] |
+| **API**| Version History REST API | `version_history_api_response.png` | REST API response from `GET /api/version-history` showing JSON release metadata. | [x] |

@@ -1,7 +1,7 @@
 # Experiment 10: Software Configuration Management Using Ansible
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -241,10 +241,10 @@ ansible-playbook -i inventory.ini deploy.yml
 
 ## 7. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   Ansible connects to target node, creates `/opt/queueless`, verifies Docker daemon, launches `queueless-app`, waits 10s, queries healthcheck endpoint with HTTP 200, and displays the success debug banner with `failed=0`.
 
-- **Observed Result:**  
+- **Observed Result:**
   Playbook syntax validation passed (`playbook: deploy.yml`). Play executed with 9 tasks `ok`, 0 failed. Deployed container verified responsive at `http://localhost:8085/`.
 
 ---
@@ -270,34 +270,55 @@ ansible-playbook -i inventory.ini deploy.yml
 
 ---
 
-## 10. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 10. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-Ansible Software Configuration Management was installed and configured on Ubuntu WSL2. The inventory and declarative deployment playbook were created, validated with `--syntax-check`, and executed. Automated provisioning, container orchestration, and application health verification were successfully achieved with zero failures.
+Experiment 10 automates the configuration management and infrastructure provisioning layer that hosts QueueLess releases:
+- **Consistent Environment Provisioning:** Ansible guarantees that target host machines have required packages, Docker runtime, persistent volume configurations (`queueless-data:/app/data`), and appropriate port mappings.
+- **Automated Configuration Audit:** Ansible tasks query both the healthcheck endpoint (`/api/tickets/stats`) and the Version History endpoint (`GET /api/version-history/current`) to programmatically verify that the deployed host is actively running the desired release version and Git commit.
+- **Verification Procedure:**
+  ```bash
+  # Inside Ubuntu WSL2 terminal:
+  cd /mnt/c/queuless/ansible
+
+  # Run the playbook
+  ansible-playbook -i inventory.ini deploy.yml
+
+  # Query the deployed version metadata
+  curl -s http://localhost:8085/api/version-history/current
+  ```
 
 ---
 
-## 11. Viva Questions and Answers
+## 11. Student Experiment Result Record
 
-1. **Why is Ansible referred to as an "Agentless" configuration management tool?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+Ansible Software Configuration Management was installed and configured on Ubuntu WSL2. The inventory and declarative deployment playbook were created, validated with `--syntax-check`, and executed. Automated provisioning, persistent volume container orchestration, and application health and version verification were successfully achieved with zero failures.
+
+---
+
+## 12. Viva Questions and Answers
+
+1. **Why is Ansible referred to as an "Agentless" configuration management tool?**
    *Answer:* Unlike Chef or Puppet which require installing and maintaining background daemon agents on every managed node, Ansible requires only standard SSH (or WinRM on Windows) and Python on the managed host. The control node pushes tasks and self-executing Python modules over SSH and cleans them up immediately after execution.
 
-2. **What does "Idempotency" mean in configuration management, and why is it important?**  
+2. **What does "Idempotency" mean in configuration management, and why is it important?**
    *Answer:* An operation is idempotent if executing it multiple times produces the exact same end state without performing unnecessary duplicate operations. For example, if a package or user already exists, an idempotent Ansible task does nothing (`ok`), avoiding downtime, configuration drift, and redundant changes.
 
-3. **What is an Ansible Inventory file and what formats are supported?**  
+3. **What is an Ansible Inventory file and what formats are supported?**
    *Answer:* The inventory file defines the list of target hosts that Ansible manages, grouped logically (e.g., `[webservers]`, `[databases]`), along with connection credentials and group variables. Supported formats include INI (`inventory.ini`) and YAML (`inventory.yml`), as well as dynamic inventory scripts for cloud environments (AWS, Azure, GCP).
 
-4. **What is the difference between an Ansible Task, a Play, and a Playbook?**  
-   *Answer:*  
-   - A **Task** is a single actionable step utilizing an Ansible module (e.g., start a service).  
-   - A **Play** is a mapped set of tasks targeted to a specific host group.  
+4. **What is the difference between an Ansible Task, a Play, and a Playbook?**
+   *Answer:*
+   - A **Task** is a single actionable step utilizing an Ansible module (e.g., start a service).
+   - A **Play** is a mapped set of tasks targeted to a specific host group.
    - A **Playbook** is the top-level YAML file that can contain one or more plays.
 
-5. **What is the purpose of the `become: yes` directive in an Ansible playbook?**  
+5. **What is the purpose of the `become: yes` directive in an Ansible playbook?**
    *Answer:* The `become` directive instructs Ansible to elevate privileges on the target node (typically via `sudo` on Linux) to execute administrative tasks requiring root access, such as installing system packages or restarting system services.

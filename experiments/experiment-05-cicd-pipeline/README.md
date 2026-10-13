@@ -1,11 +1,11 @@
 # Experiment 5: CI/CD Pipeline in Jenkins
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
-**Pipeline Item Name:** `QueueLess-CICD`  
-**Target Repository:** `https://github.com/Gokul7176/QueueLess.git`  
-**Branch:** `main`  
-**Pipeline Script:** `Jenkinsfile`  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
+**Pipeline Item Name:** `QueueLess-CICD`
+**Target Repository:** `https://github.com/Gokul7176/QueueLess.git`
+**Branch:** `main`
+**Pipeline Script:** `Jenkinsfile`
 
 ---
 
@@ -193,34 +193,63 @@ Capture these visual evidence items for your laboratory record:
 
 ---
 
-## 9. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 9. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-A production-grade 7-stage CI/CD Declarative Pipeline named `QueueLess-CICD` was created and executed in Jenkins. Automated Git checkout, compilation, JUnit 5 continuous testing, artifact packaging, Docker containerization, local container deployment, and HTTP healthcheck smoke testing were successfully demonstrated and validated.
+Experiment 5 is the primary orchestrator that creates, validates, and records releases in the Version History Monitoring module:
+- **8-Stage Release Lifecycle:**
+  1. *Checkout & Git Metadata:* Extracts real commit hash (`GIT_COMMIT`), branch, and commit message.
+  2. *Compile:* Compiles Java 17 source classes with Maven Wrapper.
+  3. *Test:* Executes 31 JUnit 5 unit and integration tests enforcing the automated quality gate.
+  4. *Package:* Generates executable fat JAR (`target/queueless-1.1.0.jar`).
+  5. *Docker Build:* Builds and tags versioned image (`queueless:1.1.0-c038603`) and `queueless:latest`.
+  6. *Deploy:* Starts container with persistent data volume `-v queueless-data:/app/data` and token.
+  7. *Verify Deployment:* Polls `/api/tickets/stats` to verify real runtime readiness.
+  8. *Record Release Metadata:* Only upon successful verification, sends `POST /api/version-history` with full Git, Jenkins build, and Docker image metadata, marking the release as verified in the dashboard!
+- **Idempotency & Failure Protection:** Repeated pipeline executions for the same build update the deployment record rather than duplicating entries. Failed builds never replace the active running release.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: Trigger the QueueLess-CICD pipeline in Jenkins
+  # http://localhost:8080/job/QueueLess-CICD/
+
+  # Step 2: Verify all 8 pipeline stages complete with green status
+
+  # Step 3: Open the Version History dashboard at:
+  # http://localhost:8085/#version-view
+  # Verify that the new release appears with CURRENT badge, matching Git commit and Jenkins build number!
+  ```
 
 ---
 
-## 10. Viva Questions and Answers
+## 10. Student Experiment Result Record
 
-1. **What is "Pipeline as Code" and why is it superior to manual Jenkins configuration?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+A production-grade 8-stage CI/CD Declarative Pipeline named `QueueLess-CICD` was created and executed in Jenkins. Automated Git checkout, compilation, JUnit 5 continuous testing, artifact packaging, Docker containerization, local container deployment, HTTP healthcheck verification, and automated release metadata recording into the Version History Monitoring module were successfully demonstrated and validated.
+
+---
+
+## 11. Viva Questions and Answers
+
+1. **What is "Pipeline as Code" and why is it superior to manual Jenkins configuration?**
    *Answer:* Pipeline as Code means defining the software delivery pipeline in a version-controlled text file (`Jenkinsfile`) stored in the project repository. It provides version history, pull-request code reviews for build modifications, instant disaster recovery, and reproducible CI/CD across environments.
 
-2. **What is an "Automated Quality Gate" in Continuous Integration?**  
+2. **What is an "Automated Quality Gate" in Continuous Integration?**
    *Answer:* A quality gate is an automated enforcement point in the pipeline (such as automated unit/integration tests or code coverage checks). If any test fails, the quality gate immediately fails the build and aborts all subsequent stages, ensuring that broken code is never packaged, containerized, or deployed.
 
-3. **How does the Declarative Pipeline handle multi-platform agents (Windows vs Linux)?**  
+3. **How does the Declarative Pipeline handle multi-platform agents (Windows vs Linux)?**
    *Answer:* The Declarative Pipeline uses the Groovy `isUnix()` condition inside a `script { ... }` block. If `isUnix()` is true, it executes shell scripts (`sh`); if false (such as on a Windows host), it executes Windows batch commands (`bat 'call mvnw.cmd ...'`).
 
-4. **Why is an application-level healthcheck (`/api/tickets/stats`) better than just checking `docker ps`?**  
+4. **Why is an application-level healthcheck (`/api/tickets/stats`) better than just checking `docker ps`?**
    *Answer:* A container can be in the `running` state even if the application inside has crashed (e.g., Spring Boot failed to connect to database or crashed during Tomcat startup). An application-level HTTP healthcheck queries the live REST API, confirming that the entire application stack is truly functional.
 
-5. **What is the difference between Continuous Integration, Continuous Delivery, and Continuous Deployment?**  
-   *Answer:*  
-   - **Continuous Integration (CI):** Automates building and testing code on every commit.  
-   - **Continuous Delivery (CD):** Automatically packages and deploys passing builds to testing/staging environments, requiring a manual trigger to release to production.  
+5. **What is the difference between Continuous Integration, Continuous Delivery, and Continuous Deployment?**
+   *Answer:*
+   - **Continuous Integration (CI):** Automates building and testing code on every commit.
+   - **Continuous Delivery (CD):** Automatically packages and deploys passing builds to testing/staging environments, requiring a manual trigger to release to production.
    - **Continuous Deployment:** Automatically releases every passing build directly to production with zero manual intervention.

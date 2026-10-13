@@ -1,7 +1,7 @@
 # Experiment 7: Creating Containers from Dockerfiles
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -145,10 +145,10 @@ curl.exe -s http://localhost:8085/api/tickets/stats
 
 ## 7. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   `docker build` completes all layers cleanly using cached Alpine base image. Container starts up, runs non-root `appuser`, passes `HEALTHCHECK`, and serves the live application.
 
-- **Observed Result (Actual Laboratory Execution):**  
+- **Observed Result (Actual Laboratory Execution):**
   ```
   [+] Building 5.6s (10/10) FINISHED
    => [1/5] FROM docker.io/library/eclipse-temurin:17-jre-alpine
@@ -184,31 +184,52 @@ curl.exe -s http://localhost:8085/api/tickets/stats
 
 ---
 
-## 10. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 10. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-A production-grade, secure, Alpine-based Dockerfile was designed and compiled for the QueueLess Spring Boot application. All directives (`FROM`, `WORKDIR`, `COPY`, `EXPOSE`, `ENTRYPOINT`, `HEALTHCHECK`) were verified, and the containerized application was successfully executed and validated over HTTP.
+Experiment 7 produces the versioned artifact images that embody every deployed QueueLess release:
+- **Version Tagging Strategy:** The Dockerfile is built and tagged with both `:latest` and a release milestone tag: `queueless:${APP_VERSION}-${GIT_COMMIT_SHORT}` (e.g. `queueless:1.1.0-c038603`). This uniquely couples the container image to the exact Git commit and semantic release.
+- **Persistent Volume Declaration:** The `VOLUME /app/data` directive defines the mount point for persistent H2 storage, ensuring that version records recorded in `release_history` survive container destruction.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: Build the image with version and commit tags
+  docker build -t queueless:latest -t queueless:1.1.0-c038603 .
+
+  # Step 2: Inspect image labels and volume configuration
+  docker inspect --format '{{json .Config.Volumes}}' queueless:1.1.0-c038603
+
+  # Step 3: Match with the Docker Image Tag recorded in Version History:
+  # http://localhost:8085/#version-view
+  ```
 
 ---
 
-## 11. Viva Questions and Answers
+## 11. Student Experiment Result Record
 
-1. **What is the difference between `ENTRYPOINT` and `CMD` in a Dockerfile?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+A production-grade, secure, Alpine-based Dockerfile was designed and compiled for the QueueLess Spring Boot application. All directives (`FROM`, `WORKDIR`, `COPY`, `EXPOSE`, `ENTRYPOINT`, `HEALTHCHECK`, `VOLUME`) were verified, producing versioned container images tracked in the QueueLess release history dashboard.
+
+---
+
+## 12. Viva Questions and Answers
+
+1. **What is the difference between `ENTRYPOINT` and `CMD` in a Dockerfile?**
    *Answer:* `ENTRYPOINT` specifies the core binary or command that will always be executed when the container starts. `CMD` provides default arguments to that command, which can be easily overridden by passing arguments to `docker run`. When used together in exec form, `ENTRYPOINT` defines the command and `CMD` defines default parameters.
 
-2. **Why is it critical to create a non-root user with the `USER` instruction?**  
+2. **Why is it critical to create a non-root user with the `USER` instruction?**
    *Answer:* By default, Docker containers run as `root` (UID 0). If an attacker manages to break out of a container via a kernel vulnerability or volume mount exploit, running as root grants them root privileges on the host operating system. Creating an unprivileged user limits damage to the container scope.
 
-3. **What is layer caching and how does instruction order affect build performance?**  
+3. **What is layer caching and how does instruction order affect build performance?**
    *Answer:* Docker caches intermediate image layers for each instruction. If an instruction and its files have not changed, Docker reuses the cached layer. Instructions that change infrequently (installing packages, creating users) should be placed at the top, while frequently changing files (`COPY target/*.jar`) should be placed toward the bottom.
 
-4. **Why is `eclipse-temurin:17-jre-alpine` preferred over a standard full JDK image for production?**  
+4. **Why is `eclipse-temurin:17-jre-alpine` preferred over a standard full JDK image for production?**
    *Answer:* An Alpine JRE image contains only the Java Runtime Environment and minimal Alpine Linux binaries (~80-150 MB), whereas a full JDK image includes compilers, debuggers, and tools (~500-800 MB). The smaller image transfers faster over networks, occupies less disk space, and has a significantly smaller attack surface.
 
-5. **What does the `HEALTHCHECK` directive enable in container orchestrators?**  
+5. **What does the `HEALTHCHECK` directive enable in container orchestrators?**
    *Answer:* `HEALTHCHECK` tells Docker and container orchestrators (Docker Swarm, Kubernetes) how to verify that the internal application is functioning correctly (e.g., polling an HTTP endpoint). If the check fails repeatedly, orchestrators mark the container unhealthy and can automatically restart or replace it.

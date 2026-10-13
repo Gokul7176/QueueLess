@@ -1,7 +1,7 @@
 # Experiment 3: Git Branching and Merging
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -138,10 +138,10 @@ git branch -d conflict-branch-a conflict-branch-b
 
 ## 7. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   Part A merges with Fast-Forward. In Part B, `git merge conflict-branch-b` halts with `CONFLICT (content): Merge conflict in docs/queue-policy.txt. Automatic merge failed; fix conflicts and then commit the result.` After staging and committing, `git status` reports working tree clean.
 
-- **Observed Result:**  
+- **Observed Result:**
   ```
   Auto-merging docs/queue-policy.txt
   CONFLICT (content): Merge conflict in docs/queue-policy.txt
@@ -171,34 +171,54 @@ git branch -d conflict-branch-a conflict-branch-b
 
 ---
 
-## 10. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 10. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-Git branch creation, switching, isolated commits, clean three-way merging, and controlled merge-conflict generation and resolution were successfully executed and documented.
+Experiment 3 demonstrates parallel feature branch workflows and release branch integration:
+- **Feature Isolation:** Feature development (such as adding the Version History module) occurs on isolated branches (e.g., `feature/version-history`) without risking production stability.
+- **Branch Tracking in Releases:** The QueueLess Version History Monitoring entity (`ReleaseHistory.gitBranch`) records the originating branch name for every release. The UI displays branch badges (`🌿 main`, `🌿 feature/...`) alongside every deployment.
+- **Release Merge Milestones:** Merging feature branches into `main` creates stable milestone commits that Jenkins builds and deploys as official releases.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: List all local branches and active branch
+  git branch -v
+
+  # Step 2: Query the QueueLess Version History endpoint
+  # Observe the gitBranch property recorded for the deployed release
+  curl -s http://localhost:8085/api/version-history/current
+  ```
 
 ---
 
-## 11. Viva Questions and Answers
+## 11. Student Experiment Result Record
 
-1. **What is HEAD in Git?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+Git branch creation, switching, isolated commits, clean three-way merging, and controlled merge-conflict generation and resolution were successfully executed and documented, demonstrating how parallel feature branches integrate into verified deployment releases tracked in the Version History dashboard.
+
+---
+
+## 12. Viva Questions and Answers
+
+1. **What is HEAD in Git?**
    *Answer:* `HEAD` is a symbolic pointer that references the currently checked-out branch or commit in your working directory. It typically points to a branch name (e.g., `refs/heads/main`), which in turn points to the latest commit.
 
-2. **What is a "Detached HEAD" state?**  
+2. **What is a "Detached HEAD" state?**
    *Answer:* A detached HEAD occurs when you check out a specific commit hash or tag directly (`git checkout <commit-hash>`) instead of a branch. Commits made in this state do not belong to any branch and can be lost if you switch branches without creating a new branch pointer.
 
-3. **What are the three parts of a Git merge conflict marker?**  
-   *Answer:*  
-   - `<<<<<<< HEAD`: Indicates changes on your current active branch.  
-   - `=======`: The separator dividing the two conflicting versions.  
+3. **What are the three parts of a Git merge conflict marker?**
+   *Answer:*
+   - `<<<<<<< HEAD`: Indicates changes on your current active branch.
+   - `=======`: The separator dividing the two conflicting versions.
    - `>>>>>>> <branch-name>`: Indicates changes coming from the branch being merged in.
 
-4. **What is the command to completely cancel a merge that resulted in conflicts?**  
+4. **What is the command to completely cancel a merge that resulted in conflicts?**
    *Answer:* `git merge --abort`. It safely resets the index and working tree back to the pre-merge state.
 
-5. **How does `git merge` differ from `git rebase`?**  
+5. **How does `git merge` differ from `git rebase`?**
    *Answer:* `git merge` preserves complete history by creating a dedicated merge commit with multiple parent references, maintaining true branch chronology. `git rebase` re-applies commits from one branch on top of another base tip, creating a linear history without merge commits, but altering commit hashes.

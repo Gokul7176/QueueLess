@@ -1,7 +1,7 @@
 # Experiment 6: Installing Docker and Executing Basic Commands
 
-**Course Code:** 23IT723 — DevOps Laboratory  
-**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System  
+**Course Code:** 23IT723 — DevOps Laboratory
+**Project:** QueueLess — End-to-End CI/CD Powered Virtual Queue Management System
 
 ---
 
@@ -129,10 +129,10 @@ docker rm lab-demo-app
 
 ## 6. Expected Result vs. Observed Result
 
-- **Expected Result:**  
+- **Expected Result:**
   All 10 commands execute cleanly. `docker --version` returns version 24+. Image pull downloads layers. Container is spawned, logged, stopped, restarted, and cleanly removed.
 
-- **Observed Result (Actual Laboratory Execution):**  
+- **Observed Result (Actual Laboratory Execution):**
   ```
   Docker version 29.6.2, build dfc4efb
   17-jre-alpine: Pulling from library/eclipse-temurin
@@ -166,31 +166,52 @@ docker rm lab-demo-app
 
 ---
 
-## 9. Student Experiment Result Record
+---
 
-**Date of Execution:** ___________________  
-**Student Name:** _______________________  
-**Roll / Register No:** _________________  
-**Staff Signature:** ____________________  
+## 9. Connection to QueueLess Version History & Release Management
 
-**Result:**  
-Docker installation was verified, and the ten fundamental Docker container lifecycle commands (`version`, `pull`, `images`, `run`, `ps`, `ps -a`, `logs`, `stop`, `start`, `rm`) were successfully demonstrated, analyzed, and recorded.
+Experiment 6 provides runtime inspection and container command tools essential for managing deployed QueueLess releases:
+- **Inspecting Active Release Images:** Commands like `docker ps` and `docker images` reveal the exact image tags (`queueless:1.1.0-c038603`) corresponding to the entries recorded in the QueueLess Version History table.
+- **Log Inspection for Provenance Audit:** Running `docker logs queueless-app` prints the Spring Boot startup logs containing the active datasource URL and release token verification notices.
+- **Verification Procedure:**
+  ```powershell
+  # Step 1: List running QueueLess release containers
+  docker ps --filter "name=queueless"
+
+  # Step 2: Inspect image labels and release tag
+  docker inspect --format '{{.Config.Image}}' queueless-app
+
+  # Step 3: Match the container tag with the Docker Tag displayed on the Version History dashboard:
+  # http://localhost:8085/#version-view
+  ```
 
 ---
 
-## 10. Viva Questions and Answers
+## 10. Student Experiment Result Record
 
-1. **What is the fundamental difference between a Docker Image and a Docker Container?**  
+**Date of Execution:** ___________________
+**Student Name:** _______________________
+**Roll / Register No:** _________________
+**Staff Signature:** ____________________
+
+**Result:**
+Docker installation was verified, and fundamental Docker container lifecycle commands (`version`, `pull`, `images`, `run`, `ps`, `ps -a`, `logs`, `stop`, `start`, `rm`) were successfully demonstrated, analyzed, and linked to the QueueLess release tracking and container monitoring workflow.
+
+---
+
+## 11. Viva Questions and Answers
+
+1. **What is the fundamental difference between a Docker Image and a Docker Container?**
    *Answer:* A Docker image is a read-only, immutable snapshot/template containing application code, libraries, and runtime dependencies. A container is a runnable, isolated instance of an image with a thin, read-write layer added on top.
 
-2. **What does the flag `-d` signify in `docker run -d`?**  
+2. **What does the flag `-d` signify in `docker run -d`?**
    *Answer:* The `-d` flag stands for "detached mode". It instructs Docker to run the container in the background and print the newly created Container ID to standard output, returning control of the terminal to the user immediately.
 
-3. **What is the syntax format of port mapping `-p 8085:8080` in `docker run`?**  
+3. **What is the syntax format of port mapping `-p 8085:8080` in `docker run`?**
    *Answer:* The format is `-p <Host_Port>:<Container_Port>`. Requests arriving at port 8085 on the host machine's physical network adapter are forwarded by the Docker proxy into port 8080 inside the container's isolated network namespace.
 
-4. **What happens to data written inside a container when the container is deleted (`docker rm`)?**  
+4. **What happens to data written inside a container when the container is deleted (`docker rm`)?**
    *Answer:* Any data written to the container's default writable layer is permanently deleted and lost upon container removal, unless that data was stored in an attached Docker Volume or Bind Mount.
 
-5. **How does `docker stop` differ from `docker kill`?**  
+5. **How does `docker stop` differ from `docker kill`?**
    *Answer:* `docker stop` sends a `SIGTERM` signal to the container's root process, allowing it to perform graceful shutdown tasks (closing DB connections, flushing buffers) before issuing `SIGKILL` after 10 seconds. `docker kill` sends `SIGKILL` immediately, terminating the process without graceful cleanup.

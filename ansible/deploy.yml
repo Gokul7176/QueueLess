@@ -10,13 +10,14 @@
   become: yes
   vars:
     app_name: queueless
-    app_version: "1.0.0"
+    app_version: "1.1.0"
     app_port: 8085
     container_port: 8085
     container_name: queueless-app
     image_name: "queueless:latest"
     deploy_dir: /opt/queueless
     health_check_url: "http://localhost:{{ app_port }}/api/tickets/stats"
+    version_check_url: "http://localhost:{{ app_port }}/api/version-history/current"
 
   tasks:
     # --------------------------------------------------------------------------
@@ -70,7 +71,7 @@
       changed_when: remove_container_result.rc == 0
 
     # --------------------------------------------------------------------------
-    # Task 6: Run Application Container
+    # Task 6: Run Application Container with Persistent Storage
     # --------------------------------------------------------------------------
     - name: Start QueueLess container
       ansible.builtin.command:
@@ -79,6 +80,7 @@
           --name {{ container_name }}
           --restart unless-stopped
           -p {{ app_port }}:{{ container_port }}
+          -v queueless-data:/app/data
           -e SERVER_PORT={{ container_port }}
           {{ image_name }}
       register: docker_run_result

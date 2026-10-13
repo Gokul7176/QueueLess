@@ -40,36 +40,38 @@ mvn clean package -DskipTests=true
 
 ### Step 4: Run the Application
 ```powershell
-java -jar target/queueless-1.0.0.jar
+java -jar target/queueless-1.1.0.jar
 ```
 
-### Step 5: Access the Web Application
+### Step 5: Access the Web Application & Version Monitor
 Open your browser and navigate to:
 - **Application URL:** `http://localhost:8085/`
+- **Version History Dashboard:** `http://localhost:8085/#version-view`
 - **H2 Database Console:** `http://localhost:8085/h2-console`
-  - JDBC URL: `jdbc:h2:mem:queuelessdb`
+  - JDBC URL: `jdbc:h2:file:./data/queuelessdb`
   - Username: `sa`
   - Password: `password`
 
 ---
 
-## 3. Quick Start: Option B (Docker Container)
+## 3. Quick Start: Option B (Docker Container with Persistent Volume)
 
-### Step 1: Build the Docker Image
+### Step 1: Build the Versioned Docker Image
 ```powershell
 cd C:\queuless
-docker build -t queueless:latest .
+docker build -t queueless:latest -t queueless:1.1.0-c038603 .
 ```
 
-### Step 2: Launch the Docker Container
+### Step 2: Launch the Docker Container with Data Volume
 ```powershell
-docker run -d -p 8085:8085 --name queueless-app queueless:latest
+docker run -d -p 8085:8085 -v queueless-data:/app/data --name queueless-app queueless:latest
 ```
 
-### Step 3: Verify Container Health
+### Step 3: Verify Container Health & Version
 ```powershell
 docker ps --filter "name=queueless-app"
 docker logs --tail 20 queueless-app
+curl http://localhost:8085/api/version-history/current
 ```
 
 ### Step 4: Stop and Remove Container
@@ -80,13 +82,14 @@ docker rm queueless-app
 
 ---
 
-## 4. Quick Start: Option C (Jenkins Pipeline)
+## 4. Quick Start: Option C (Jenkins CI/CD Pipeline)
 
 1. Launch Jenkins on `http://localhost:8080`.
-2. Ensure `JDK-17` and `Maven-3.9.6` are registered under **Manage Jenkins -> Tools**.
-3. Create a **New Item -> Pipeline** named `QueueLess-Pipeline`.
-4. Under Pipeline definition, select **Pipeline script from SCM**, choose **Git**, specify your repository URL, and set script path to `Jenkinsfile`.
-5. Click **Build Now** to trigger the 7-stage automated build, test, and container deployment.
+2. Ensure `JDK-17` or `JDK-21` is registered under **Manage Jenkins -> Tools**.
+3. Optionally add secret text credential `RELEASE_TRACKER_TOKEN` under **Manage Jenkins -> Credentials**.
+4. Create a **New Item -> Pipeline** named `QueueLess-CICD`.
+5. Under Pipeline definition, select **Pipeline script from SCM**, choose **Git**, specify `https://github.com/Gokul7176/QueueLess.git`, and set script path to `Jenkinsfile`.
+6. Click **Build Now** to trigger the 8-stage automated build, test, container deployment, and release history recording.
 
 ---
 
