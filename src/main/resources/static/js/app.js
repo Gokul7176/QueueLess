@@ -535,10 +535,18 @@
                     </button>
                 `;
             } else if (t.status === 'WAITING') {
-                actionButtons = `
-                    <button class="btn btn-outline-danger btn-sm btn-cancel-action" data-ticket="${t.ticketNumber}">
-                        Cancel
+                const callBtn = t.queuePosition === 1 ? `
+                    <button class="btn btn-primary btn-sm btn-call-eligible-action" data-ticket="${t.ticketNumber}" title="Call next waiting customer immediately (FIFO)">
+                        📢 Call Next
                     </button>
+                ` : '';
+                actionButtons = `
+                    <div style="display:inline-flex; gap:0.35rem; align-items:center;">
+                        ${callBtn}
+                        <button class="btn btn-outline-danger btn-sm btn-cancel-action" data-ticket="${t.ticketNumber}">
+                            Cancel
+                        </button>
+                    </div>
                 `;
             } else {
                 actionButtons = `<span style="font-size:0.75rem; color:var(--text-subtle);">Done</span>`;
@@ -565,6 +573,12 @@
             btn.addEventListener('click', () => {
                 const ticketNo = btn.getAttribute('data-ticket');
                 handleCompleteTicket(ticketNo);
+            });
+        });
+
+        elements.ticketsTableBody.querySelectorAll('.btn-call-eligible-action').forEach(btn => {
+            btn.addEventListener('click', () => {
+                handleCallNext();
             });
         });
 

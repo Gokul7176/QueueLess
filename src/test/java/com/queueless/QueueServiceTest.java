@@ -190,4 +190,96 @@ class QueueServiceTest {
         assertEquals(17L, stats.getTotalCount());
         assertEquals(20, stats.getEstimatedWaitMinutes()); // 4 * 5 = 20 mins
     }
+
+    @Test
+    @DisplayName("Test 10: Admin calls waiting ticket before estimated wait expires succeeds immediately")
+    void testCallNextTicket_BeforeEstimatedWaitExpires_Success() {
+        QueueTicket freshTicket = new QueueTicket("QL-0010", "Alice Quick", "Express Desk");
+        freshTicket.setStatus(TicketStatus.WAITING);
+        freshTicket.setCreatedAt(LocalDateTime.now().minusSeconds(5));
+        freshTicket.setEstimatedWaitMinutes(15); // Informational wait is in the future
+
+        when(ticketRepository.findFirstByStatusOrderByCreatedAtAsc(TicketStatus.WAITING))
+                .thenReturn(Optional.of(freshTicket));
+        when(ticketRepository.save(any(QueueTicket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        QueueTicket servedTicket = queueService.callNextTicket("Counter 1");
+
+        assertNotNull(servedTicket);
+        assertEquals(TicketStatus.SERVING, servedTicket.getStatus());
+        assertEquals("Counter 1", servedTicket.getCounterName());
+        assertNotNull(servedTicket.getServedAt());
+        assertEquals(0, servedTicket.getQueuePosition());
+        assertEquals(0, servedTicket.getEstimatedWaitMinutes());
+    }
+
+    @Test
+    @DisplayName("Test 11: Admin completes serving ticket before original estimated wait expires succeeds immediately")
+    void testCompleteTicket_BeforeOriginalEstimatedWaitExpires_Success() {
+        QueueTicket servingTicket = new QueueTicket("QL-0011", "Bob Fast", "General");
+        servingTicket.setStatus(TicketStatus.SERVING);
+        servingTicket.setCounterName("Counter 2");
+        servingTicket.setCreatedAt(LocalDateTime.now().minusSeconds(20)); // Created 20s ago, well before 10m estimate
+        servingTicket.setServedAt(LocalDateTime.now().minusSeconds(5));
+
+        when(ticketRepository.findByTicketNumber("QL-0011")).thenReturn(Optional.of(servingTicket));
+        when(ticketRepository.save(any(QueueTicket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        QueueTicket completedTicket = queueService.completeTicket("QL-0011");
+
+        assertNotNull(completedTicket);
+        assertEquals(TicketStatus.COMPLETED, completedTicket.getStatus());
+        assertNotNull(completedTicket.getCompletedAt());
+        assertNull(completedTicket.getQueuePosition());
+        assertEquals(0, completedTicket.getEstimatedWaitMinutes());
+    }
+
+    @Test
+    @DisplayName("Test 12: Admin calling next customer strictly honors FIFO ordering regardless of wait duration")
+    void testCallNextTicket_StrictFifoOrder_SelectsOldestWaitingTicket() {
+        QueueTicket olderTicket = new QueueTicket("QL-0001", "Early Bird", "Desk");
+        olderTicket.setStatus(TicketStatus.WAITING);
+        olderTicket.setCreatedAt(LocalDateTime.now().minusMinutes(10));
+
+        when(ticketRepository.findFirstByStatusOrderByCreatedAtAsc(TicketStatus.WAITING))
+                .thenReturn(Optional.of(olderTicket));
+        when(ticketRepository.save(any(QueueTicket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        QueueTicket servedTicket = queueService.callNextTicket("Counter 3");
+
+        assertEquals("QL-0001", servedTicket.getTicketNumber());
+        assertEquals(TicketStatus.SERVING, servedTicket.getStatus());
+    }
+
+    @Test
+    @DisplayName("Test 13: Cancelling a WAITING ticket transitions to CANCELLED and clears wait time")
+    void testCancelTicket_WaitingTicket_Success() {
+        QueueTicket waitingTicket = new QueueTicket("QL-0015", "Eve Polastri", "Security");
+        waitingTicket.setStatus(TicketStatus.WAITING);
+        waitingTicket.setEstimatedWaitMinutes(10);
+
+        when(ticketRepository.findByTicketNumber("QL-0015")).thenReturn(Optional.of(waitingTicket));
+        when(ticketRepository.save(any(QueueTicket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        QueueTicket cancelled = queueService.cancelTicket("QL-0015");
+
+        assertNotNull(cancelled);
+        assertEquals(TicketStatus.CANCELLED, cancelled.getStatus());
+        assertNull(cancelled.getQueuePosition());
+        assertEquals(0, cancelled.getEstimatedWaitMinutes());
+    }
+
+    @Test
+    @DisplayName("Test 14: Completing a CANCELLED ticket throws InvalidTicketStateException")
+    void testCompleteTicket_CancelledTicket_ThrowsException() {
+        QueueTicket cancelledTicket = new QueueTicket("QL-0016", "Villanelle", "Operations");
+        cancelledTicket.setStatus(TicketStatus.CANCELLED);
+
+        when(ticketRepository.findByTicketNumber("QL-0016")).thenReturn(Optional.of(cancelledTicket));
+
+        InvalidTicketStateException ex = assertThrows(InvalidTicketStateException.class, () -> {
+            queueService.completeTicket("QL-0016");
+        });
+        assertTrue(ex.getMessage().contains("was cancelled and cannot be completed"));
+    }
 }

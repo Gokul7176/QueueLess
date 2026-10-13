@@ -155,4 +155,91 @@ class QueueControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.servingCount", is(1)))
                 .andExpect(jsonPath("$.data.totalCount", is(2)));
     }
+
+    @Test
+    @DisplayName("Integration Test 9: POST /api/tickets/call-next calls waiting ticket immediately before estimated wait expires")
+    void testCallNextEndpoint_BeforeEstimatedWaitExpires_Success() throws Exception {
+        QueueTicket freshTicket = new QueueTicket("QL-0035", "Tony Stark", "Tech Support");
+        freshTicket.setStatus(TicketStatus.WAITING);
+        ticketRepository.save(freshTicket);
+
+        CallNextRequest callRequest = new CallNextRequest("Counter 1");
+
+        mockMvc.perform(post("/api/tickets/call-next")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(callRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.ticketNumber", is("QL-0035")))
+                .andExpect(jsonPath("$.data.status", is("SERVING")))
+                .andExpect(jsonPath("$.data.queuePosition", is(0)))
+                .andExpect(jsonPath("$.data.estimatedWaitMinutes", is(0)));
+    }
+
+    @Test
+    @DisplayName("Integration Test 10: POST /api/tickets/{ticketNumber}/complete completes ticket immediately before original estimate expires")
+    void testCompleteTicketEndpoint_BeforeOriginalEstimatedWaitExpires_Success() throws Exception {
+        QueueTicket servingTicket = new QueueTicket("QL-0036", "Steve Rogers", "Leadership");
+        servingTicket.setStatus(TicketStatus.SERVING);
+        servingTicket.setCounterName("Desk 4");
+        ticketRepository.save(servingTicket);
+
+        mockMvc.perform(post("/api/tickets/QL-0036/complete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.ticketNumber", is("QL-0036")))
+                .andExpect(jsonPath("$.data.status", is("COMPLETED")));
+    }
+
+    @Test
+    @DisplayName("Integration Test 11: POST /api/tickets/{ticketNumber}/complete rejects completing a WAITING ticket directly")
+    void testCompleteTicketEndpoint_WaitingTicketDirectly_FailsWithBadRequest() throws Exception {
+        QueueTicket waitingTicket = new QueueTicket("QL-0037", "Wanda Maximoff", "Magic Desk");
+        waitingTicket.setStatus(TicketStatus.WAITING);
+        ticketRepository.save(waitingTicket);
+
+        mockMvc.perform(post("/api/tickets/QL-0037/complete"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.error", is("Invalid State Transition")))
+                .andExpect(jsonPath("$.message", containsString("cannot be completed before being called to a service counter")));
+    }
+
+    @Test
+    @DisplayName("Integration Test 12: POST /api/tickets/{ticketNumber}/cancel cancels waiting ticket successfully")
+    void testCancelTicketEndpoint_WaitingTicket_Success() throws Exception {
+        QueueTicket waitingTicket = new QueueTicket("QL-0038", "Peter Parker", "Photo Desk");
+        waitingTicket.setStatus(TicketStatus.WAITING);
+        ticketRepository.save(waitingTicket);
+
+        mockMvc.perform(post("/api/tickets/QL-0038/cancel"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.ticketNumber", is("QL-0038")))
+                .andExpect(jsonPath("$.data.status", is("CANCELLED")));
+    }
+
+    @Test
+    @DisplayName("Integration Test 13: POST /api/tickets/call-next preserves strict FIFO dispatch ordering")
+    void testCallNextEndpoint_FifoOrderPreserved() throws Exception {
+        QueueTicket t1 = new QueueTicket("QL-0041", "First Customer", "General");
+        t1.setStatus(TicketStatus.WAITING);
+        t1.setCreatedAt(java.time.LocalDateTime.now().minusMinutes(10));
+        ticketRepository.save(t1);
+
+        QueueTicket t2 = new QueueTicket("QL-0042", "Second Customer", "General");
+        t2.setStatus(TicketStatus.WAITING);
+        t2.setCreatedAt(java.time.LocalDateTime.now().minusMinutes(3));
+        ticketRepository.save(t2);
+
+        CallNextRequest callReq = new CallNextRequest("Counter 2");
+
+        mockMvc.perform(post("/api/tickets/call-next")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(callReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.ticketNumber", is("QL-0041")))
+                .andExpect(jsonPath("$.data.status", is("SERVING")));
+    }
 }
