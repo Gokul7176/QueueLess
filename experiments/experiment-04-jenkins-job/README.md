@@ -9,7 +9,7 @@
 ---
 
 ## 1. Aim
-To configure a Jenkins Freestyle build job named `QueueLess-Build` connected to the official GitHub repository `https://github.com/Gokul7176/QueueLess.git`, automate code checkout on branch `main`, compile and execute the 17 JUnit 5 automated test cases using the project's native Maven Wrapper (`mvnw.cmd`), publish JUnit XML test reports, inspect console outputs, and verify failure detection.
+To configure a Jenkins Freestyle build job named `QueueLess-Build` connected to the official GitHub repository `https://github.com/Gokul7176/QueueLess.git`, automate code checkout on branch `main`, compile and execute the automated JUnit 5 test suite (17 baseline tests in v1.0.0, expanding to 33 tests in v1.1.0) using the project's native Maven Wrapper (`mvnw.cmd`), package the production application JAR, archive build artifacts, publish JUnit XML test reports, inspect console outputs, and verify quality gate failure detection.
 
 ---
 
@@ -76,28 +76,81 @@ Follow these exact steps in your web browser:
 1. Scroll down to the **Build Steps** section.
 2. Click **Add build step** -> Select **Execute Windows batch command**.
 3. In the **Command** text area, enter:
-   ```cmd
-   call mvnw.cmd clean compile test
-   ```
-   *(Note: The `call` prefix ensures that `mvnw.cmd` returns control to Jenkins so post-build actions and exit codes are recorded accurately).*
+   ```bat
+   @echo off
+   echo ===== Git version =====
+   git --version
 
-### Step 6: Configure Post-build Actions (JUnit Test Reporting)
+   echo ===== Java version =====
+   java -version
+
+   echo ===== Build, test and package =====
+   call mvnw.cmd -B clean test package
+   ```
+   *(Note: The `call` prefix ensures that `mvnw.cmd` returns control to Jenkins so post-build actions and exit codes are recorded accurately without early process termination).*
+
+### Step 6: Configure Post-build Actions (JUnit Test Reporting & Artifact Archiving)
 1. Click **Add post-build action** -> Select **Publish JUnit test result report**.
-2. In **Test report XMLs**, enter:
-   ```
-   target/surefire-reports/*.xml
-   ```
+   - In **Test report XMLs**, enter:
+     ```
+     target/surefire-reports/*.xml
+     ```
+2. Click **Add post-build action** -> Select **Archive the artifacts**.
+   - In **Files to archive**, enter:
+     ```
+     target/*.jar,target/surefire-reports/*.xml
+     ```
 3. Click **Save** to store the job configuration.
 
 ---
 
 ## 5. Build Execution & Log Verification
 
-1. On the **`QueueLess-Build`** project page, click **Build Now** on the left menu.
-2. Under **Build History**, click the flashing blue ball for **Build #1**.
-3. Click **Console Output** to monitor the live build log.
+### Build History Summary
+The `QueueLess-Build` Freestyle project tracks sequential CI builds triggered against `origin/main`:
 
-### Expected Console Output Snippet:
+| Build # | Trigger Timestamp | Checkout Git Commit | Duration | Automated Tests | Build Result | Artifacts Archived |
+|:---|:---|:---|:---|:---|:---|:---|
+| **#1** | 12-Oct-2026 22:29 | `c038603f4a6d` | 1 min 22 s | 17 passed (0 failed, 0 skipped) | `SUCCESS` | Surefire XML reports |
+| **#2** | 13-Oct-2026 13:18 | `8b8297d02712` | 52.34 s (52,342 ms) | 33 passed (0 failed, 0 skipped) | `SUCCESS` | JAR (`46.70 MiB`) + 4 XML reports |
+
+---
+
+### Build #2 Detailed Verification
+
+1. **Trigger & SCM Checkout:**
+   - Started by user `admin` via Jenkins UI **Build Now**.
+   - Remote repository: `https://github.com/Gokul7176/QueueLess.git`
+   - Target branch: `*/main`
+   - Revision checked out: `8b8297d02712ef89e21caff5f3d0baf5c1a2669c` (`origin/main`)
+   - Commit message: `"fix(pipeline): sanitize json release metadata and secure process token passing"`
+
+2. **Environment Diagnostics & Tool Verification:**
+   - **Git Version:** `git version 2.55.0.windows.2`
+   - **Java Version:** `openjdk version "21.0.11" 2026-04-21 LTS` (Temurin-21.0.11+10, 64-Bit Server VM)
+   - **Maven Goals Executed:** `call mvnw.cmd -B clean test package`
+
+3. **Automated Test Results (33 Tests Executed, 0 Failures):**
+   - `com.queueless.QueueControllerIntegrationTest`: 8 tests run, 0 failures, 0 errors, 0 skipped (20.64 s)
+   - `com.queueless.QueueServiceTest`: 9 tests run, 0 failures, 0 errors, 0 skipped (2.057 s)
+   - `com.queueless.ReleaseHistoryControllerIntegrationTest`: 10 tests run, 0 failures, 0 errors, 0 skipped (0.944 s)
+   - `com.queueless.ReleaseHistoryServiceTest`: 6 tests run, 0 failures, 0 errors, 0 skipped (0.336 s)
+   - **Overall Test Result:** `Tests run: 33, Failures: 0, Errors: 0, Skipped: 0` (100% passing)
+
+4. **Packaging & Artifact Archiving:**
+   - Built JAR: `target/queueless-1.1.0.jar` (48,971,765 bytes / 46.70 MiB)
+   - Archived Artifacts:
+     - `target/queueless-1.1.0.jar`
+     - `target/surefire-reports/TEST-com.queueless.QueueControllerIntegrationTest.xml` (34.50 KiB)
+     - `target/surefire-reports/TEST-com.queueless.QueueServiceTest.xml` (29.10 KiB)
+     - `target/surefire-reports/TEST-com.queueless.ReleaseHistoryControllerIntegrationTest.xml` (30.60 KiB)
+     - `target/surefire-reports/TEST-com.queueless.ReleaseHistoryServiceTest.xml` (28.87 KiB)
+
+5. **JUnit Test Trend Status:**
+   - Test Result Trend updated dynamically in Jenkins UI from **17 passed** (#1) to **33 passed** (#2).
+   - Test Health: 100% Sunny weather report, zero failures, zero regressions.
+
+### Actual Build #2 Console Output Snippet:
 ```text
 Started by user admin
 Running as SYSTEM
@@ -105,28 +158,64 @@ Building in workspace C:\ProgramData\Jenkins\.jenkins\workspace\QueueLess-Build
 [WS-CLEANUP] Deleting project workspace...
 Cloning the remote Git repository
 Cloning repository https://github.com/Gokul7176/QueueLess.git
- > git.exe init C:\ProgramData\Jenkins\.jenkins\workspace\QueueLess-Build
- > git.exe fetch --tags --force --progress -- https://github.com/Gokul7176/QueueLess.git +refs/heads/*:refs/remotes/origin/*
- > git.exe checkout -f refs/remotes/origin/main
-Commit message: "ci: enhance Jenkinsfile and auto-detect JAVA_HOME in mvnw.cmd for Windows Jenkins agent"
-
-[QueueLess-Build] $ cmd /c call mvnw.cmd clean compile test
+ > git.exe init C:\ProgramData\Jenkins\.jenkins\workspace\QueueLess-Build # timeout=10
+Fetching upstream changes from https://github.com/Gokul7176/QueueLess.git
+ > git.exe --version # timeout=10
+ > git --version # 'git version 2.55.0.windows.2'
+ > git.exe fetch --tags --force --progress -- https://github.com/Gokul7176/QueueLess.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git.exe rev-parse "refs/remotes/origin/main^{commit}" # timeout=10
+Checking out Revision 8b8297d02712ef89e21caff5f3d0baf5c1a2669c (refs/remotes/origin/main)
+ > git.exe config core.sparsecheckout # timeout=10
+ > git.exe checkout -f 8b8297d02712ef89e21caff5f3d0baf5c1a2669c # timeout=10
+Commit message: "fix(pipeline): sanitize json release metadata and secure process token passing"
+ > git.exe rev-list --no-walk 4ec99c15b43fd8e4070f594c82fafb9a7cd1e2cf # timeout=10
+[QueueLess-Build] $ cmd /c call C:\WINDOWS\TEMP\jenkins5050843533870433493.bat
+===== Git version =====
+git version 2.55.0.windows.2
+===== Java version =====
+openjdk version "21.0.11" 2026-04-21 LTS
+OpenJDK Runtime Environment Temurin-21.0.11+10 (build 21.0.11+10-LTS)
+OpenJDK 64-Bit Server VM Temurin-21.0.11+10 (build 21.0.11+10-LTS, mixed mode, sharing)
+===== Build, test and package =====
 [INFO] Scanning for projects...
-[INFO] Building QueueLess 1.0.0
+[INFO]
+[INFO] -----------------------< com.queueless:queueless >-----------------------
+[INFO] Building queueless 1.1.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ queueless ---
 [INFO] --- maven-compiler-plugin:3.13.0:compile (default-compile) @ queueless ---
-[INFO] Compiling 16 source files
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 21 source files with javac [debug release 21] to target\classes
+[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ queueless ---
+[INFO] --- maven-compiler-plugin:3.13.0:testCompile (default-testCompile) @ queueless ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 4 source files with javac [debug release 21] to target\test-classes
 [INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ queueless ---
 [INFO] Running com.queueless.QueueControllerIntegrationTest
-[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.64 s -- in com.queueless.QueueControllerIntegrationTest
 [INFO] Running com.queueless.QueueServiceTest
-[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.057 s -- in com.queueless.QueueServiceTest
+[INFO] Running com.queueless.ReleaseHistoryControllerIntegrationTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.944 s -- in com.queueless.ReleaseHistoryControllerIntegrationTest
+[INFO] Running com.queueless.ReleaseHistoryServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.336 s -- in com.queueless.ReleaseHistoryServiceTest
 [INFO]
 [INFO] Results:
-[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
 [INFO]
+[INFO] Tests run: 33, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] --- maven-jar-plugin:3.4.1:jar (default-jar) @ queueless ---
+[INFO] Building jar: C:\ProgramData\Jenkins\.jenkins\workspace\QueueLess-Build\target\queueless-1.1.0.jar
+[INFO] --- spring-boot-maven-plugin:3.3.0:repackage (repackage) @ queueless ---
+[INFO] Replacing main artifact C:\ProgramData\Jenkins\.jenkins\workspace\QueueLess-Build\target\queueless-1.1.0.jar with repackaged archive
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
+[INFO] Total time:  47.973 s
+[INFO] Finished at: 2026-10-13T13:19:14+05:30
+[INFO] ------------------------------------------------------------------------
+Archiving artifacts
 Recording test results
 Finished: SUCCESS
 ```
@@ -161,14 +250,14 @@ To demonstrate that `QueueLess-Build` properly reports failures when bugs or syn
 
 ## 7. Screenshot Checklist
 
-Capture the following screenshots from your Jenkins interface for your lab record:
+The following screenshots from the Jenkins web interface have been captured, visually verified, and archived in [`docs/screenshots/experiment-04/`](../../docs/screenshots/experiment-04/):
 
-- [ ] `exp04_01_freestyle_item_creation.png`: New Item screen showing `QueueLess-Build` selected as Freestyle project.
-- [ ] `exp04_02_git_scm_config.png`: Job configuration showing Git URL `https://github.com/Gokul7176/QueueLess.git` and branch `*/main`.
-- [ ] `exp04_03_batch_build_step.png`: Build step showing `call mvnw.cmd clean compile test`.
-- [ ] `exp04_04_junit_action_config.png`: Post-build Action showing `target/surefire-reports/*.xml`.
-- [ ] `exp04_05_console_build_success.png`: Console Output page ending in `BUILD SUCCESS` and `Finished: SUCCESS`.
-- [ ] `exp04_06_test_result_trend.png`: Jenkins Test Result Trend graph showing 17 passed tests with 0 failures.
+- [x] [`exp04_01_jenkins_dashboard.png`](../../docs/screenshots/experiment-04/exp04_01_jenkins_dashboard.png): Jenkins dashboard showing `QueueLess-Build` listed among active jobs with a sunny weather report, blue/green status ball, and Build #2 metrics.
+- [x] [`exp04_02_job_config_scm_step.png`](../../docs/screenshots/experiment-04/exp04_02_job_config_scm_step.png): Freestyle job configuration showing Git SCM (`*/main`), Windows batch build step (`call mvnw.cmd -B clean test package`), and post-build archiving/JUnit actions.
+- [x] [`exp04_03_build_page.png`](../../docs/screenshots/experiment-04/exp04_03_build_page.png): Project status page for `QueueLess-Build` displaying Build #2, Test Result Trend graph (rising from 17 to 33 passed tests), and archived artifacts list.
+- [x] [`exp04_04_console_output.png`](../../docs/screenshots/experiment-04/exp04_04_console_output.png): Build #2 Console Output verifying Git version, Java 21 LTS version, Maven test execution across all 4 suites, and packaging completion.
+- [x] [`exp04_05_junit_test_report.png`](../../docs/screenshots/experiment-04/exp04_05_junit_test_report.png): Published JUnit test report for Build #2 showing 33 passed tests (0 failures, 0 skipped, +16 tests) across the `com.queueless` package.
+- [x] [`exp04_06_archived_artifacts.png`](../../docs/screenshots/experiment-04/exp04_06_archived_artifacts.png): Build #2 execution page highlighting the "Build Artifacts" section listing `queueless-1.1.0.jar` (46.70 MiB) and Surefire XML test reports.
 
 ---
 
@@ -183,19 +272,17 @@ Capture the following screenshots from your Jenkins interface for your lab recor
 
 ---
 
----
-
 ## 9. Connection to QueueLess Version History & Release Management
 
 Experiment 4 establishes the Continuous Integration (CI) foundation for the Version History module:
 - **Build Number Attribution:** Every Jenkins build run increments the official sequential build number (e.g., `#1`, `#2`). QueueLess Version History records this exact `jenkinsBuildNumber` and provides clickable links to the Jenkins run (`jenkinsBuildUrl`).
-- **Automated Test Quality Gate:** Jenkins collects test metrics from `target/surefire-reports/*.xml`. If any of the 31 automated tests fail, the build fails immediately. Broken code is NEVER recorded as a deployed release.
+- **Automated Test Quality Gate:** Jenkins collects test metrics from `target/surefire-reports/*.xml`. If any of the 33 automated tests fail, the build fails immediately. Broken code is NEVER recorded as a deployed release.
 - **Verification Procedure:**
   ```powershell
   # Step 1: Open the Jenkins build history
   # Navigate to: http://localhost:8080/job/QueueLess-Build/
 
-  # Step 2: Note the latest successful build number (e.g., #1)
+  # Step 2: Note the latest successful build number (e.g., #2)
 
   # Step 3: Open QueueLess Version History Dashboard:
   # http://localhost:8085/#version-view
@@ -206,13 +293,12 @@ Experiment 4 establishes the Continuous Integration (CI) foundation for the Vers
 
 ## 10. Student Experiment Result Record
 
-**Date of Execution:** ___________________
-**Student Name:** _______________________
-**Roll / Register No:** _________________
-**Staff Signature:** ____________________
+**Date of Execution:** 13-October-2026
+**Student Name:** Gokul
+**Course Code:** 23IT723 — DevOps Laboratory
 
 **Result:**
-A Jenkins Freestyle job named `QueueLess-Build` was successfully created and connected to GitHub repository `https://github.com/Gokul7176/QueueLess.git`. Automated source checkout, compilation, test execution using `mvnw.cmd`, and JUnit test report publication were verified with zero failures, establishing CI build provenance for the QueueLess release tracking system.
+A Jenkins Freestyle job named `QueueLess-Build` was successfully configured, integrated with GitHub repository `https://github.com/Gokul7176/QueueLess.git`, and verified on branch `main` (commit `8b8297d`). Execution of Build #2 demonstrated automated source checkout, JDK 21 LTS environment validation, clean test and package execution via `mvnw.cmd -B clean test package`, JAR packaging (`queueless-1.1.0.jar`, 46.70 MiB), artifact archiving, and JUnit test reporting across 33 test cases with 100% pass rate and zero failures (build duration: 52.34s). The job operated safely and independently without disrupting the running production container (`queueless-app` on port 8085) or database volume (`queueless-data`), successfully completing the experiment objectives.
 
 ---
 
